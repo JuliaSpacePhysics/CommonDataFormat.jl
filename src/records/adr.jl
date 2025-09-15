@@ -1,0 +1,43 @@
+"""
+Attribute Descriptor Record (ADR)
+
+Contains a description of an attribute in a CDF. There will be one ADR per attribute. The ADRhead field of the ADR contains the file offset of the first ADR.
+"""
+struct ADR <: Record
+    header::Header
+    ADRnext::Int64    # Offset to next ADR in chain
+    AgrEDRhead::Int64    # The offset of the first Attribute g/rEntry Descriptor Record (AgrEDR) for this attribute.
+    Scope::Int32     # Offset to first attribute descriptor record
+    Num::Int32          # Attribute number
+    NgrEntries::Int32      # Number of r-variables
+    MAXgrEntry::Int32     # Number of attributes
+    rfuA::Int32        # Reserved field A
+    AzEDRhead::Int64   # The offset of the first Attribute zEntry Descriptor Record (AzEDR) for this attribute.
+    NzEntries::Int32      # Number of z-variables
+    MAXzEntry::Int32     # Number of z-entries
+    rfuE::Int32        # Reserved field E
+    Name::String
+end
+
+"""
+    ADR(io::IO, RecordSizeType)
+
+Load an Attribute Descriptor Record from the IO stream at the specified offset.
+"""
+function ADR(io::IO, RecordSizeType)
+    # Read header
+    header = Header(io, RecordSizeType)
+    @assert header.record_type == 4
+
+    # Read ADR fields
+    ADRnext = read_be(io, Int64)
+    AgrEDRhead = read_be(io, Int64)
+    fields1 = read_be(io, 5, Int32)
+    az_edrhead = read_be(io, Int64)
+    fields2 = read_be(io, 3, Int32)
+    name = readname(io)
+
+    return ADR(
+        header, ADRnext, AgrEDRhead, fields1..., az_edrhead, fields2..., name
+    )
+end
