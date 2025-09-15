@@ -9,12 +9,11 @@ function readname(io::IO)
 end
 
 """
-    load_vdr(io::IO, offset, RecordSizeType) -> VDR
+    VDR(io::IO, RecordSizeType) -> VDR
 
 Load a Variable Descriptor Record from the IO stream at the specified offset.
 """
-@inline function load_vdr(io::IO, offset, RecordSizeType)
-    seek(io, offset)
+@inline function VDR(io::IO, RecordSizeType)
     header = Header(io, RecordSizeType)
     @assert header.record_type in (3, 8)
 
@@ -36,12 +35,8 @@ Load a Variable Descriptor Record from the IO stream at the specified offset.
     )
 end
 
-function load_rVDR(io::IO, offset, RecordSizeType)
-    return load_vdr(io, offset, RecordSizeType)
-end
-
 function load_zVDR(io::IO, offset, RecordSizeType)
-    vdr = load_vdr(io, offset, RecordSizeType)
+    vdr = VDR(io, offset, RecordSizeType)
     z_num_dims = read_uint32_be(io)
 
     # Read dimension sizes

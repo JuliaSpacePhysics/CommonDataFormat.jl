@@ -26,8 +26,8 @@ function CDFDataset(filename)
         compression = CompressionType(compression_bytes)
         RecordSizeType = is_cdf_v3(magic_bytes) ? UInt64 : UInt32
         # Parse CDF header to extract version, majority, and compression
-        cdr = load_cdr(io, 8, RecordSizeType)
-        gdr = load_gdr(io, cdr.gdr_offset, RecordSizeType)
+        cdr = CDR(io, 8, RecordSizeType)
+        gdr = GDR(io, cdr.gdr_offset, RecordSizeType)
         return CDFDataset{compression, RecordSizeType}(filename, cdr, gdr)
     end
 end
@@ -105,7 +105,7 @@ function Base.keys(cdf::CDFDataset)
         i = 1
         for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
             while current_offset != 0
-                vdr = load_vdr(io, current_offset, RecordSizeType)
+                vdr = VDR(io, current_offset, RecordSizeType)
                 varnames[i] = vdr.name
                 i += 1
                 current_offset = vdr.vdr_next
