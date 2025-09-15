@@ -2,9 +2,11 @@
 CurrentModule = CommonDataFormat
 ```
 
-# CommonDataFormat
+# CommonDataFormat.jl
 
-Documentation for [CommonDataFormat](https://github.com/Beforerr/CommonDataFormat.jl).
+A Julia package for reading Common Data Format (CDF) files.
+
+## API Reference
 
 ```@index
 ```
