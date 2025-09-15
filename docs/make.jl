@@ -8,9 +8,7 @@ makedocs(;
     authors="Beforerr <zzj956959688@gmail.com> and contributors",
     sitename="CommonDataFormat.jl",
     format=Documenter.HTML(;
-        canonical="https://Beforerr.github.io/CommonDataFormat.jl",
-        edit_link="main",
-        assets=String[],
+        canonical="https://juliaspacephysics.github.io/CommonDataFormat.jl",
     ),
     pages=[
         "Home" => "index.md",
@@ -18,6 +16,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/Beforerr/CommonDataFormat.jl",
+    repo="github.com/JuliaSpacePhysics/CommonDataFormat.jl",
     devbranch="main",
 )

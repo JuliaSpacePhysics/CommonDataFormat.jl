@@ -45,13 +45,14 @@ end
 
 function Base.size(vdr::zVDR, gdr_r_dim_sizes)
     records = vdr.max_rec + 1
-    return if vdr.z_num_dims > 0
+    dims = if vdr.z_num_dims > 0
         # Z-variable: use its own dimensions
         (vdr.z_dim_sizes..., records)
     else
         # R-variable: use GDR dimensions
         (gdr_r_dim_sizes..., records)
     end
+    return Int.(dims)
 end
 
 """

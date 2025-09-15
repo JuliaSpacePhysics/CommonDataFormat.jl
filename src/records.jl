@@ -97,6 +97,9 @@ end
 
 Base.iterate(vdr::VDR, i = 1) = i > fieldcount(typeof(vdr)) ? nothing : (getfield(vdr, i), i + 1)
 
+"""
+z-Variable Descriptor Record (zVDR)
+"""
 struct zVDR{DT}
     header::Header
     vdr_next::Int64     # Offset to next VDR in chain

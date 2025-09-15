@@ -4,6 +4,5 @@
 /Manifest*.toml
 /docs/Manifest*.toml
 /docs/build/
-data/
 ref/
 .claude/

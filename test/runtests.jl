@@ -12,6 +12,14 @@ const PROJECT_DATA_PATH = joinpath(@__DIR__, "..", "data")
 # include("basic_tests.jl")
 # include("cdf_file_tests.jl")
 
+function data_path(name)
+    for dir in [CDFpp_TEST_DATA_PATH, CDFlib_TEST_DATA_PATH, PROJECT_DATA_PATH]
+        path = joinpath(dir, name)
+        isfile(path) && return path
+    end
+    error("Data file not found: $name")
+end
+
 function check_cdf_file(cdf, version, majority, compression)
     @test cdf.version == version
     @test cdf.majority == majority
@@ -25,25 +33,25 @@ function check_variables(cdf)
 end
 
 @testset "Uncompressed cdf file" begin
-    file = joinpath(CDFpp_TEST_DATA_PATH, "a_cdf.cdf")
+    file = data_path("a_cdf.cdf")
     ds = CDFDataset(file)
     check_cdf_file(ds, (3, 9, 0), CDF.Row, CDF.NoCompression)
 end
 
 @testset "CHECK_VARIABLES - Variable structure verification" begin
-    file = joinpath(PROJECT_DATA_PATH, "omni_coho1hr_merged_mag_plasma_20240901_v01.cdf")
+    file = data_path("omni_coho1hr_merged_mag_plasma_20240901_v01.cdf")
     ds = CDFDataset(file)
     @test keys(ds) == ["Epoch", "heliographicLatitude", "heliographicLongitude", "BR", "BT", "BN", "ABS_B", "V", "elevAngle", "azimuthAngle", "N", "T"]
     @test ds["BR"].data[1:3] == Float32[6.7, 6.7, 7.3]
 end
 
 @testset "CHECK_VARIABLES - CDF_CHAR" begin
-    file = joinpath(PROJECT_DATA_PATH, "ge_h0_cpi_00000000_v01.cdf")
+    file = data_path("ge_h0_cpi_00000000_v01.cdf")
     ds = CDFDataset(file)
     @info ds["label_v3c"]
 end
 @testset "CHECK_VARIABLES - Variable structure verification" begin
-    file = joinpath(CDFpp_TEST_DATA_PATH, "a_cdf.cdf")
+    file = data_path("a_cdf.cdf")
     ds = CDFDataset(file)
 
     # Check total number of variables (should be 18 as per C++)
