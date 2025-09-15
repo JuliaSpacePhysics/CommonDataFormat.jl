@@ -39,16 +39,6 @@ Majority(cdr::CDR) = (cdr.flags & 0x01) != 0 ? Majority(0) : Majority(1)  # Row=
 is_cdf_v3(cdr::CDR) = cdr.version == 3
 
 """
-File header containing parsed information from CDR
-"""
-struct FileHeader
-    version::Tuple{UInt32, UInt32, UInt32}
-    majority::Majority
-    compression::CompressionType
-    cdr::CDR  # Store the parsed CDR for reference
-end
-
-"""
 Global Descriptor Record (GDR) - contains global information about the CDF file
 Points to variable and attribute descriptor records
 """
@@ -143,6 +133,15 @@ struct VVR{T}
     data::Vector{T}     # Raw variable data
 end
 
+for R in (:CDR, :GDR, :VXR, :VDR)
+    @eval begin
+        @inline function $R(io::IO, offset, RecordSizeType)
+            seek(io, offset)
+            return $R(io, RecordSizeType)
+        end
+    end
+end
+
 # Utility functions to decode CDR flags
 """
     decode_cdr_flags(flags::UInt32)
@@ -165,20 +164,6 @@ function decode_cdr_flags(flags)
     )
 end
 
-"""
-    extract_file_properties(cdr::CDR)
-
-Extract high-level file properties from parsed CDR record.
-"""
-function extract_file_properties(cdr)
-    # Extract version tuple
-    version = (cdr.version, cdr.release, cdr.increment)
-
-    # Extract majority from flags (bit 0: 1=row major, 0=column major)
-    majority = (cdr.flags & 0x01) != 0 ? Majority(0) : Majority(1)  # Row=0, Column=1
-    return (version, majority)
-end
-
 # Pretty printing for CDR structure
 function Base.show(io::IO, cdr::CDR)
     flag_info = decode_cdr_flags(cdr.flags)
@@ -195,11 +180,4 @@ function Base.show(io::IO, cdr::CDR)
     println(io, "    - Checksum Used: $(flag_info.checksum_used)")
     println(io, "    - MD5 Checksum: $(flag_info.md5_checksum)")
     return println(io, "  Identifier: $(cdr.identifier)")
-end
-
-function Base.show(io::IO, header::FileHeader)
-    println(io, "CDF File Header:")
-    println(io, "  Version: $(header.version)")
-    println(io, "  Majority: $(header.majority)")
-    return println(io, "  Compression: $(header.compression)")
 end

@@ -1,11 +1,9 @@
 """
-    VXR(io::IO, offset, RecordSizeType)
+    VXR(io::IO, RecordSizeType)
 
 Load a Variable Index Record from the IO stream at the specified offset.
 """
-function VXR(io::IO, offset, RecordSizeType)
-    seek(io, offset)
-
+function VXR(io::IO, RecordSizeType)
     # Read header
     header = Header(io, RecordSizeType)
     @assert header.record_type == 6 "Invalid VXR record type"

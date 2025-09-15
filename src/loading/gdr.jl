@@ -1,10 +1,9 @@
 """
-    load_gdr(io::IO, offset::UInt64, is_v3::Bool) -> GDR
+    GDR(io::IO, RecordSizeType)
 
 Load a Global Descriptor Record from the IO stream at the specified offset.
 """
-@inline function load_gdr(io::IO, offset::UInt64, RecordSizeType)
-    seek(io, offset)
+@inline function GDR(io::IO, RecordSizeType)
     # Read header
     header = Header(io, RecordSizeType)
     @assert header.record_type == 2
