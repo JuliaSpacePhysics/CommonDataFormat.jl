@@ -1,5 +1,9 @@
 # CDF Record structures and definitions
 # Based on the C++ CDFpp implementation structure
+# [CDF Internal Format Description](https://spdf.gsfc.nasa.gov/pub/software/cdf/doc/cdfifd.pdf)
+abstract type Record end
+
+Base.iterate(r::Record, i = 1) = i > fieldcount(typeof(r)) ? nothing : (getfield(r, i), i + 1)
 
 """
 CDF Record header structure - common to all record types
@@ -15,77 +19,10 @@ end
     return Header(record_size, record_type)
 end
 
-"""
-CDF Descriptor Record (CDR) - the main file header record
-Contains version, encoding, format information, and pointer to GDR
-"""
-struct CDR
-    header::Header
-    gdr_offset::UInt64   # Can be UssInt32 for v2, UInt64 for v3
-    version::Int32
-    release::Int32
-    encoding::Int32
-    flags::Int32
-    rfu_a::Int32       # Reserved field A
-    rfu_b::Int32       # Reserved field B
-    increment::Int32
-    identifier::Int32
-    rfu_e::Int32       # Reserved field E
-    # Note: copyright string follows but we'll handle it separately
-end
-
-version(cdr::CDR; verbose = true) = verbose ? (cdr.version, cdr.release, cdr.increment) : cdr.version
-Majority(cdr::CDR) = (cdr.flags & 0x01) != 0 ? Majority(0) : Majority(1)  # Row=0, Column=1
-is_cdf_v3(cdr::CDR) = cdr.version == 3
-
-"""
-Global Descriptor Record (GDR) - contains global information about the CDF file
-Points to variable and attribute descriptor records
-"""
-struct GDR
-    header::Header
-    rVDRhead::Int64    # Offset to first r-variable descriptor record
-    zVDRhead::Int64    # Offset to first z-variable descriptor record
-    ADRhead::Int64     # Offset to first attribute descriptor record
-    eof::Int64          # End of file offset
-    NrVars::Int32      # Number of r-variables
-    num_attr::Int32     # Number of attributes
-    r_max_rec::Int32    # Maximum record number for r-variables
-    r_num_dims::Int32   # Number of dimensions for r-variables
-    NzVars::Int32      # Number of z-variables
-    uir_head::Int64     # Unused internal record head
-    rfu_c::Int32        # Reserved field C
-    leap_second_last_updated::Int32
-    rfu_e::Int32        # Reserved field E
-    r_dim_sizes::Vector{UInt32}  # Dimension sizes for r-variables
-end
-
-"""
-Variable Descriptor Record (VDR) - describes a single variable
-Can be either r-variable (record variant) or z-variable (zero variant)
-
-See also: [zVDR](@ref)
-"""
-struct VDR{DT}
-    header::Header
-    vdr_next::Int64     # Offset to next VDR in chain
-    data_type::DT    # CDF data type
-    max_rec::Int32       # Maximum record number (-1 if none)
-    vxr_head::Int64     # Variable indeX Record head
-    vxr_tail::Int64     # Variable indeX Record tail
-    flags::UInt32        # Variable flags
-    s_records::UInt32    # Sparse records flag
-    rfu_b::UInt32        # Reserved field B
-    rfu_c::UInt32        # Reserved field C
-    rfu_f::UInt32        # Reserved field F
-    num_elems::UInt32    # Number of elements (for strings)
-    num::UInt32          # Variable number
-    cpr_or_spr_offset::UInt64  # Compression/Sparseness Parameters Record offset
-    blocking_factor::UInt32
-    name::String         # Variable name
-end
-
-Base.iterate(vdr::VDR, i = 1) = i > fieldcount(typeof(vdr)) ? nothing : (getfield(vdr, i), i + 1)
+include("cdr.jl")
+include("vdr.jl")
+include("adr.jl")
+include("gdr.jl")
 
 """
 z-Variable Descriptor Record (zVDR)
@@ -112,6 +49,25 @@ struct zVDR{DT}
     dim_varys::Vector{UInt32}    # Dimension variance flags
 end
 
+
+@inline function zVDR(io::IO, args...)
+    vdr = VDR(io, args...)
+    z_num_dims = read_uint32_be(io)
+
+    # Read dimension sizes
+    z_dim_sizes = Vector{UInt32}(undef, z_num_dims)
+    dim_varys = Vector{UInt32}(undef, z_num_dims)
+    for i in eachindex(z_dim_sizes)
+        z_dim_sizes[i] = read_uint32_be(io)
+    end
+    # Read dimension variance flags
+    for i in eachindex(dim_varys)
+        dim_varys[i] = read_uint32_be(io)
+    end
+
+    return zVDR(vdr..., z_num_dims, z_dim_sizes, dim_varys)
+end
+
 """
 Variable Index Record (VXR) - contains pointers to variable data records
 """
@@ -133,7 +89,7 @@ struct VVR{T}
     data::Vector{T}     # Raw variable data
 end
 
-for R in (:CDR, :GDR, :VXR, :VDR)
+for R in (:ADR, :CDR, :GDR, :VXR, :VDR)
     @eval begin
         @inline function $R(io::IO, offset, RecordSizeType)
             seek(io, offset)

@@ -1,5 +1,29 @@
-# GDR and VDR loading functionality
-# Handles loading of Global Descriptor Record and Variable Descriptor Records
+# VDR loading functionality
+
+"""
+Variable Descriptor Record (VDR) - describes a single variable
+Can be either r-variable (record variant) or z-variable (zero variant)
+
+See also: [zVDR](@ref)
+"""
+struct VDR{DT} <: Record
+    header::Header
+    vdr_next::Int64     # Offset to next VDR in chain
+    data_type::DT    # CDF data type
+    max_rec::Int32       # Maximum record number (-1 if none)
+    vxr_head::Int64     # Variable indeX Record head
+    vxr_tail::Int64     # Variable indeX Record tail
+    flags::UInt32        # Variable flags
+    s_records::UInt32    # Sparse records flag
+    rfu_b::UInt32        # Reserved field B
+    rfu_c::UInt32        # Reserved field C
+    rfu_f::UInt32        # Reserved field F
+    num_elems::UInt32    # Number of elements (for strings)
+    num::UInt32          # Variable number
+    cpr_or_spr_offset::UInt64  # Compression/Sparseness Parameters Record offset
+    blocking_factor::UInt32
+    name::String         # Variable name
+end
 
 # Read variable name (null-terminated string, up to 256 chars)
 function readname(io::IO)
@@ -33,22 +57,4 @@ Load a Variable Descriptor Record from the IO stream at the specified offset.
         flags, s_records, rfu_b, rfu_c, rfu_f, num_elems, num,
         cpr_or_spr_offset, blocking_factor, name
     )
-end
-
-function load_zVDR(io::IO, offset, RecordSizeType)
-    vdr = VDR(io, offset, RecordSizeType)
-    z_num_dims = read_uint32_be(io)
-
-    # Read dimension sizes
-    z_dim_sizes = Vector{UInt32}(undef, z_num_dims)
-    dim_varys = Vector{UInt32}(undef, z_num_dims)
-    for i in eachindex(z_dim_sizes)
-        z_dim_sizes[i] = read_uint32_be(io)
-    end
-    # Read dimension variance flags
-    for i in eachindex(dim_varys)
-        dim_varys[i] = read_uint32_be(io)
-    end
-
-    return zVDR(vdr..., z_num_dims, z_dim_sizes, dim_varys)
 end
