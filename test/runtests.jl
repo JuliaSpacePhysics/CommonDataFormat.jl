@@ -26,12 +26,6 @@ function check_cdf_file(cdf, version, majority, compression)
     return @test cdf.compression == compression
 end
 
-function check_attributes(cdf)
-end
-
-function check_variables(cdf)
-end
-
 @testset "Uncompressed cdf file" begin
     file = data_path("a_cdf.cdf")
     ds = CDFDataset(file)
@@ -42,7 +36,13 @@ end
     file = data_path("omni_coho1hr_merged_mag_plasma_20240901_v01.cdf")
     ds = CDFDataset(file)
     @test keys(ds) == ["Epoch", "heliographicLatitude", "heliographicLongitude", "BR", "BT", "BN", "ABS_B", "V", "elevAngle", "azimuthAngle", "N", "T"]
-    @test ds["BR"][1:3] == Float32[6.7, 6.7, 7.3]
+    var = ds["BR"]
+    @test var[1:3] == Float32[6.7, 6.7, 7.3]
+    @test var["UNITS"] == "nT"
+    @test var["FIELDNAM"] == "BR (RTN)"
+    @test @allocations(ds["BR"]) <= 50
+    @info @allocations var["UNITS"]
+    # 17.875 μs (56 allocs: 6.141 KiB)
 end
 
 @testset "CHECK_VARIABLES - CDF_CHAR" begin

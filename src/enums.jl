@@ -55,25 +55,27 @@ function cdf_type_size(cdf_type)
     return size_map[DataType(cdf_type)]
 end
 
+const type_map = Dict(
+    CDF_INT1 => Int8,
+    CDF_INT2 => Int16,
+    CDF_INT4 => Int32,
+    CDF_INT8 => Int64,
+    CDF_UINT1 => UInt8,
+    CDF_UINT2 => UInt16,
+    CDF_UINT4 => UInt32,
+    CDF_REAL4 => Float32,
+    CDF_REAL8 => Float64,
+    CDF_BYTE => Int8,
+    CDF_FLOAT => Float32,
+    CDF_DOUBLE => Float64,
+    CDF_CHAR => Char,
+    CDF_UCHAR => UInt8,
+    CDF_EPOCH => Int64,
+    CDF_TIME_TT2000 => Int64
+)
 
 function julia_type(cdf_type)
-    type_map = Dict(
-        CDF_INT1 => Int8,
-        CDF_INT2 => Int16,
-        CDF_INT4 => Int32,
-        CDF_INT8 => Int64,
-        CDF_UINT1 => UInt8,
-        CDF_UINT2 => UInt16,
-        CDF_UINT4 => UInt32,
-        CDF_REAL4 => Float32,
-        CDF_REAL8 => Float64,
-        CDF_BYTE => Int8,
-        CDF_FLOAT => Float32,
-        CDF_DOUBLE => Float64,
-        CDF_CHAR => Char,
-        CDF_UCHAR => UInt8,
-        CDF_EPOCH => Int64,
-        CDF_TIME_TT2000 => Int64
-    )
     return type_map[cdf_type]
 end
+
+julia_type(i::Integer) = julia_type(DataType(i))
