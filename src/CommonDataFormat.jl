@@ -1,20 +1,22 @@
 module CommonDataFormat
 
-using Dates
+using Dates, UnixTimes
 using Mmap
 using Dictionaries
+using StaticStrings
 
-export CDFDataset, CDFAttribute, CDFVariable, varget, attrget
+export CDFDataset, CDFVariable
 export Majority, CompressionType, DataType
+export Epoch, Epoch16, TT2000
 
+include("epochs.jl")
 include("enums.jl")
 include("parsing.jl")
 include("records/records.jl")
-include("attribute.jl")
 include("dataset.jl")
 include("variable.jl")
-include("loading/vvr.jl")
 include("loading/attribute.jl")
+include("loading/variable.jl")
 
 """
     attrib(cdf::CDFDataset, attribute_name::String)

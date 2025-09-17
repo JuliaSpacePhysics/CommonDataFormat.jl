@@ -55,15 +55,10 @@ Load an Attribute Descriptor Record from the buffer at the specified position.
     header = Header(buffer, pos, RecordSizeType)
     @assert header.record_type == 4
     pos += sizeof(RecordSizeType) + 4
-
     # Read ADR fields
-    ADRnext, pos = read_be_i(buffer, pos, Int64)
-    AgrEDRhead, pos = read_be_i(buffer, pos, Int64)
-    fields1, pos = read_be_i(buffer, pos, 5, Int32)
-    AzEDRhead, pos = read_be_i(buffer, pos, Int64)
-    fields2, pos = read_be_i(buffer, pos, 3, Int32)
+    fields, pos = @read_be_fields(buffer, pos, fieldtypes(ADR)[2:(end - 1)]...)
     name = readname(buffer, pos)
     return ADR(
-        header, ADRnext, AgrEDRhead, fields1..., AzEDRhead, fields2..., name
+        header, fields..., name
     )
 end

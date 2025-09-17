@@ -34,7 +34,7 @@ function attrib(cdf::CDFDataset; predicate = is_global)
 end
 
 """
-    vattrib(cdf::CDFDataset, varnum::Integer) -> Dict{String, Any}
+    vattrib(cdf::CDFDataset, varnum::Integer)
 
 Get all variable attributes for a specific variable number.
 """

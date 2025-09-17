@@ -17,7 +17,7 @@ struct GDR
     rfu_c::Int32        # Reserved field C
     leap_second_last_updated::Int32
     rfu_e::Int32        # Reserved field E
-    r_dim_sizes::Tuple{Vararg{UInt32}}  # Dimension sizes for r-variables
+    r_dim_sizes::Tuple{Vararg{Int32}}  # Dimension sizes for r-variables
 end
 
 
@@ -26,22 +26,15 @@ end
 
 Load a Global Descriptor Record from the buffer at the specified offset.
 """
-@inline function GDR(buffer::Vector{UInt8}, pos, RecordSizeType)
-    # Read header
+@inline function GDR(buffer::Vector{UInt8}, offset, RecordSizeType)
+    pos = offset + 1
     header = Header(buffer, pos, RecordSizeType)
     @assert header.record_type == 2
     pos += sizeof(RecordSizeType) + 4
 
     # Read GDR fields
-    fields1, pos = read_be_i(buffer, pos, 4, RecordSizeType)
-    (nr_vars, num_attr, r_max_rec, r_num_dims, nz_vars), pos = read_be_i(buffer, pos, 5, Int32)
-    uir_head, pos = read_be_i(buffer, pos, Int64)
-    fields3, pos = read_be_i(buffer, pos, 3, Int32)
-    # Read dimension sizes array
-    r_dim_sizes = read_be(buffer, pos, r_num_dims, UInt32)
-    return GDR(
-        header, fields1..., nr_vars, num_attr,
-        r_max_rec, r_num_dims, nz_vars, uir_head, fields3...,
-        r_dim_sizes
-    )
+    fields, pos = @read_be_fields(buffer, pos, fieldtypes(GDR)[2:(end - 1)]...)
+    r_num_dims = fields[8]
+    r_dim_sizes = read_be(buffer, pos, r_num_dims, Int32)
+    return GDR(header, fields..., r_dim_sizes)
 end

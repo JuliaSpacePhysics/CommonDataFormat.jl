@@ -31,6 +31,7 @@ include("vxr.jl")
 include("adr.jl")
 include("aedr.jl")
 include("gdr.jl")
+include("vvr.jl")
 
 for R in (:ADR, :AEDR, :GDR, :VDR)
     @eval begin

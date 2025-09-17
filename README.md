@@ -9,7 +9,7 @@ A Julia package for reading Common Data Format (CDF) files, widely used in space
 ## Features
 
 - **Pure Julia implementation** - No external dependencies on CDF libraries
-- **Efficient data access** - Lazy loading and direct variable indexing
+- **Efficient data access** - Lazy loading and memory-mapped access
 
 ## Installation
 
@@ -44,3 +44,4 @@ println("Dimensions: ", var.dimensions)
 ## Elsewhere
 
 - [CDFpp](https://github.com/SciQLop/CDFpp): A modern C++ header only cdf library with Python bindings
+- [cdflib](https://github.com/MAVENSDC/cdflib): A python module for reading and writing NASA's Common Data Format (cdf) files

@@ -22,6 +22,8 @@ function Base.getproperty(var::CDFVariable, name::Symbol)
     name in fieldnames(CDFVariable) && return getfield(var, name)
     if name === :attrib
         return vattrib(var.parentdataset, var.vdr.num)
+    elseif name === :datatype
+        return DataType(var.vdr.data_type)
     else
         throw(ArgumentError("Unknown property $name"))
     end
@@ -32,4 +34,9 @@ function Base.getindex(var::CDFVariable, name::String)
     at = vattrib(var.parentdataset, var.vdr.num, name)
     isnothing(at) && throw(KeyError(name))
     return at
+end
+
+function Base.haskey(var::CDFVariable, name::String)
+    at = vattrib(var.parentdataset, var.vdr.num, name)
+    return !isnothing(at)
 end

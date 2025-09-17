@@ -17,8 +17,6 @@ end
 
 Load a Variable Index Record from the source at the specified offset.
 """
-function VXR end
-
 function VXR(source::Vector{UInt8}, offset, RecordSizeType)
     pos = offset + 1
     header = Header(source, pos, RecordSizeType)

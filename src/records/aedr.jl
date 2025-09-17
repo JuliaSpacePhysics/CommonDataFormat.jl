@@ -25,9 +25,12 @@ end
     datatype = read_be(buffer, offset + 25, Int32)
     NumElems = read_be(buffer, offset + 33, Int32)
     T = julia_type(datatype)
-    needs_byte_swap = is_big_endian_encoding(cdf_encoding) && T <: Number
-    data = load_attribute_data(T, buffer, offset + 57, NumElems, needs_byte_swap)
-    return data
+    return if datatype in (CDF_CHAR, CDF_UCHAR)
+        load_char_data(buffer, offset + 57, NumElems)
+    else
+        needs_byte_swap = is_big_endian_encoding(cdf_encoding)
+        load_attribute_data(T, buffer, offset + 57, NumElems, needs_byte_swap)
+    end
 end
 
 
@@ -36,10 +39,10 @@ function load_attribute_data(::Type{T}, buffer::Vector{UInt8}, pos, NumElems, ne
     dst_ptr = pointer(data)
     src_ptr = convert(Ptr{T}, pointer(buffer, pos))
     unsafe_copyto!(dst_ptr, src_ptr, NumElems)
-    needs_byte_swap && map!(ntoh, data, data)
+    needs_byte_swap && _btye_swap!(data)
     return data
 end
 
-function load_attribute_data(::Type{Char}, buffer::Vector{UInt8}, pos, NumElems, needs_byte_swap)
+function load_char_data(buffer::Vector{UInt8}, pos, NumElems)
     return @views String((buffer[pos:(pos + NumElems - 1)]))
 end

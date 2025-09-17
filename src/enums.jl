@@ -46,14 +46,8 @@ end
 DataType(x::DataType) = x
 DataType(x::UInt32) = DataType(Int32(x))
 
-function cdf_type_size(cdf_type)
-    size_map = Dict(
-        CDF_INT1 => 1, CDF_INT2 => 2, CDF_INT4 => 4, CDF_INT8 => 8, CDF_UINT1 => 1, CDF_UINT2 => 2, CDF_UINT4 => 4,
-        CDF_REAL4 => 4, CDF_REAL8 => 8, CDF_FLOAT => 4, CDF_DOUBLE => 8, CDF_EPOCH => 8,
-        CDF_EPOCH16 => 16, CDF_TIME_TT2000 => 8, CDF_CHAR => 1, CDF_UCHAR => 1
-    )
-    return size_map[DataType(cdf_type)]
-end
+Base.:(==)(x::DataType, y::T) where {T <: Integer} = T(x) == y
+Base.:(==)(x::T, y::DataType) where {T <: Integer} = x == T(y)
 
 const type_map = Dict(
     CDF_INT1 => Int8,
@@ -68,11 +62,11 @@ const type_map = Dict(
     CDF_BYTE => Int8,
     CDF_FLOAT => Float32,
     CDF_DOUBLE => Float64,
-    CDF_CHAR => Char,
+    CDF_CHAR => UInt8,
     CDF_UCHAR => UInt8,
-    CDF_EPOCH => Int64,
-    CDF_EPOCH16 => Int64,
-    CDF_TIME_TT2000 => Int64
+    CDF_EPOCH => Epoch,
+    CDF_EPOCH16 => Epoch16,
+    CDF_TIME_TT2000 => TT2000
 )
 
 function julia_type(cdf_type)

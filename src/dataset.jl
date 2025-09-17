@@ -32,7 +32,7 @@ function CDFDataset(filename)
         RecordSizeType = is_cdf_v3(magic_bytes) ? UInt64 : UInt32
         # Parse CDF header
         cdr = CDR(buffer, 9, RecordSizeType)
-        gdr = GDR(buffer, cdr.gdr_offset + 1, RecordSizeType)
+        gdr = GDR(buffer, cdr.gdr_offset, RecordSizeType)
         return CDFDataset{compression, RecordSizeType}(filename, cdr, gdr, buffer)
     end
 end
@@ -47,11 +47,11 @@ function Base.getproperty(cdf::CDFDataset{CT}, name::Symbol) where {CT}
     elseif name === :compression
         return CT
     elseif name === :adr
-        return open(cdf.filename, "r") do io
-            return ADR(io, cdf.gdr.ADRhead, recordsize_type(cdf))
-        end
+        return ADR(parent(cdf), GDR(cdf).ADRhead, recordsize_type(cdf))
     elseif name === :attrib
         return attrib(cdf)
+    elseif name === :vattrib
+        return attrib(cdf; predicate = !is_global)
     else
         throw(ArgumentError("Unknown property $name"))
     end
@@ -75,35 +75,26 @@ end
 
 # Direct variable access via indexing
 function Base.getindex(cdf::CDFDataset, var_name::String)
-    # 20% faster than using buffer `mmap`
-    return open(filename(cdf), "r") do io
-        RecordSizeType = recordsize_type(cdf)
-        gdr = cdf.gdr
-        vdr = find_vdr(cdf, var_name)
-        isnothing(vdr) && throw(KeyError(var_name))
-        data = load_variable_data(io, vdr, RecordSizeType, gdr.r_dim_sizes, cdf.cdr.encoding)
-        return CDFVariable(var_name, data, vdr, cdf)
-    end
+    return variable(cdf, var_name)
 end
 
 Base.length(cdf::CDFDataset) = length(keys(cdf))
 
 function Base.keys(cdf::CDFDataset)
-    return open(cdf.filename, "r") do io
-        RecordSizeType = recordsize_type(cdf)
-        gdr = cdf.gdr
-        varnames = Vector{String}(undef, gdr.NrVars + gdr.NzVars)
-        i = 1
-        for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
-            while current_offset != 0
-                vdr = VDR(io, current_offset, RecordSizeType)
-                varnames[i] = vdr.name
-                i += 1
-                current_offset = vdr.vdr_next
-            end
+    RecordSizeType = recordsize_type(cdf)
+    gdr = cdf.gdr
+    source = parent(cdf)
+    varnames = Vector{String}(undef, gdr.NrVars + gdr.NzVars)
+    i = 1
+    for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
+        while current_offset != 0
+            vdr = VDR(source, current_offset, RecordSizeType)
+            varnames[i] = String(vdr.name)
+            i += 1
+            current_offset = vdr.vdr_next
         end
-        return varnames
     end
+    return varnames
 end
 
 Base.haskey(cdf::CDFDataset, var_name::String) = var_name in keys(cdf)
