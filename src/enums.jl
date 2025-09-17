@@ -71,6 +71,7 @@ const type_map = Dict(
     CDF_CHAR => Char,
     CDF_UCHAR => UInt8,
     CDF_EPOCH => Int64,
+    CDF_EPOCH16 => Int64,
     CDF_TIME_TT2000 => Int64
 )
 

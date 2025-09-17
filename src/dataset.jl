@@ -50,7 +50,7 @@ function Base.getproperty(cdf::CDFDataset{CT}, name::Symbol) where {CT}
         return open(cdf.filename, "r") do io
             return ADR(io, cdf.gdr.ADRhead, recordsize_type(cdf))
         end
-    elseif name === :attribs
+    elseif name === :attrib
         return attrib(cdf)
     else
         throw(ArgumentError("Unknown property $name"))
@@ -81,8 +81,6 @@ function Base.getindex(cdf::CDFDataset, var_name::String)
         gdr = cdf.gdr
         vdr = find_vdr(cdf, var_name)
         isnothing(vdr) && throw(KeyError(var_name))
-        # var_atts = vattrib(cdf, num)
-        @debug dump(var_atts)
         data = load_variable_data(io, vdr, RecordSizeType, gdr.r_dim_sizes, cdf.cdr.encoding)
         return CDFVariable(var_name, data, vdr, cdf)
     end

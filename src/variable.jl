@@ -29,5 +29,7 @@ end
 
 # Get the corresponding metadata
 function Base.getindex(var::CDFVariable, name::String)
-    return vattrib(var.parentdataset, var.vdr.num)[name]
+    at = vattrib(var.parentdataset, var.vdr.num, name)
+    isnothing(at) && throw(KeyError(name))
+    return at
 end

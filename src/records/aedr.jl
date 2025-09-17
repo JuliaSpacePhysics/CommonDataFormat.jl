@@ -36,7 +36,7 @@ function load_attribute_data(::Type{T}, buffer::Vector{UInt8}, pos, NumElems, ne
     dst_ptr = pointer(data)
     src_ptr = convert(Ptr{T}, pointer(buffer, pos))
     unsafe_copyto!(dst_ptr, src_ptr, NumElems)
-    needs_byte_swap && map!(ntoh, data)
+    needs_byte_swap && map!(ntoh, data, data)
     return data
 end
 

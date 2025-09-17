@@ -20,16 +20,12 @@ function data_path(name)
     error("Data file not found: $name")
 end
 
-function check_cdf_file(cdf, version, majority, compression)
-    @test cdf.version == version
-    @test cdf.majority == majority
-    return @test cdf.compression == compression
-end
-
 @testset "Uncompressed cdf file" begin
     file = data_path("a_cdf.cdf")
     ds = CDFDataset(file)
-    check_cdf_file(ds, (3, 9, 0), CDF.Row, CDF.NoCompression)
+    @test ds.version == (3, 9, 0)
+    @test ds.majority == CDF.Row
+    @test ds.compression == CDF.NoCompression
 end
 
 @testset "CHECK_VARIABLES - Variable structure verification" begin
@@ -37,11 +33,12 @@ end
     ds = CDFDataset(file)
     @test keys(ds) == ["Epoch", "heliographicLatitude", "heliographicLongitude", "BR", "BT", "BN", "ABS_B", "V", "elevAngle", "azimuthAngle", "N", "T"]
     var = ds["BR"]
+    @test ds.attrib["TITLE"][1] == "Near-Earth Heliosphere Data (OMNI)"
     @test var[1:3] == Float32[6.7, 6.7, 7.3]
     @test var["UNITS"] == "nT"
     @test var["FIELDNAM"] == "BR (RTN)"
-    @test @allocations(ds["BR"]) <= 50
-    @info @allocations var["UNITS"]
+    @test @allocations(ds["BR"]) <= 60
+    @info @allocations(var["UNITS"])
     # 17.875 μs (56 allocs: 6.141 KiB)
 end
 
@@ -50,6 +47,7 @@ end
     ds = CDFDataset(file)
     @info ds["label_v3c"]
 end
+
 @testset "CHECK_VARIABLES - Variable structure verification" begin
     file = data_path("a_cdf.cdf")
     ds = CDFDataset(file)

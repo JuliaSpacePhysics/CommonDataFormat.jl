@@ -57,6 +57,30 @@ function vattrib(cdf::CDFDataset, varnum::Integer)
     return attributes
 end
 
+"""
+    vattrib(cdf, varnum, name)
+
+Optimized version that loads only the requested attribute for the given variable number.
+Much faster than loading all attributes when only one is needed.
+"""
+function vattrib(cdf, varnum, name)
+    RecordSizeType = recordsize_type(cdf)
+    buffer = cdf.buffer
+    cdf_encoding = cdf.cdr.encoding
+
+    # Search for the specific attribute by name first
+    offsets = get_offsets(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    for offset in offsets
+        adr = ADR(buffer, offset, RecordSizeType)
+        is_global(adr) && continue
+        String(adr.Name) != name && continue
+        @assert min(adr.AgrEDRhead, adr.AzEDRhead) == 0
+        head = max(adr.AgrEDRhead, adr.AzEDRhead)
+        return _search_aedr_entries(buffer, head, RecordSizeType, cdf_encoding, varnum)
+    end
+    return nothing
+end
+
 attrib(var::CDFVariable) = vattrib(var.parentdataset, var.vdr.num)
 
 function _search_aedr_entries(source, aedr_head::Int64, RecordSizeType, cdf_encoding::Int32, target_varnum::Integer)
