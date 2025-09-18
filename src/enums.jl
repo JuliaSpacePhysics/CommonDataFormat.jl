@@ -3,6 +3,13 @@
     Column = 1
 end
 
+@enum RecordType::Int8 begin
+    VXR_ = 6
+    VVR_ = 7
+    CVXR_ = 12
+    CVVR_ = 13
+end
+
 @enum CompressionType::Int8 begin
     NoCompression = 0
     RLECompression = 1
@@ -10,16 +17,6 @@ end
     AdaptiveHuffmanCompression = 3
     GzipCompression = 5
     ZstdCompression = 16
-end
-
-const NoCompressionBytes = [0x00, 0x00, 0xff, 0xff]
-
-function CompressionType(bytes::UInt32)
-    if bytes == 0x0000FFFF
-        return NoCompression
-    else
-        return GzipCompression
-    end
 end
 
 @enum DataType begin
@@ -46,6 +43,8 @@ end
 DataType(x::DataType) = x
 DataType(x::UInt32) = DataType(Int32(x))
 
+Base.:(==)(x::RecordType, y::T) where {T <: Integer} = T(x) == y
+Base.:(==)(x::T, y::RecordType) where {T <: Integer} = x == T(y)
 Base.:(==)(x::DataType, y::T) where {T <: Integer} = T(x) == y
 Base.:(==)(x::T, y::DataType) where {T <: Integer} = x == T(y)
 

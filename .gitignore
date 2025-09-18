@@ -6,3 +6,5 @@
 /docs/build/
 ref/
 .claude/
+data/
+!data/a_*.cdf

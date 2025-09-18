@@ -8,8 +8,10 @@
 # Buffer-based reading functions for zero-copy access
 # https://github.com/JuliaLang/julia/issues/31305
 @inline function read_be(v::Vector{UInt8}, i, T)
-    p = convert(Ptr{T}, pointer(v, i))
-    return ntoh(unsafe_load(p))
+    return GC.@preserve v begin
+        p = convert(Ptr{T}, pointer(v, i))
+        ntoh(unsafe_load(p))
+    end
 end
 
 @inline function read_be(v::Vector{UInt8}, i, n, T)
@@ -139,4 +141,4 @@ function validate_cdf_magic(magic_bytes)
 end
 
 _btye_swap!(data) = map!(ntoh, data, data)
-_btye_swap!(data::Array{StaticString{N}}) where {N} = data
+_btye_swap!(data::AbstractArray{StaticString{N}}) where {N} = data

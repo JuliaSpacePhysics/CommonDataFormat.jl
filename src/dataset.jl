@@ -26,10 +26,12 @@ function CDFDataset(filename)
         magic_bytes = read_be(buffer, 1, UInt32)
         @assert validate_cdf_magic(magic_bytes)
 
-        # Read compression info
-        compression_bytes = read_be(buffer, 5, UInt32)
-        compression = CompressionType(compression_bytes)
-        RecordSizeType = is_cdf_v3(magic_bytes) ? UInt64 : UInt32
+        RecordSizeType = is_cdf_v3(magic_bytes) ? Int64 : Int32
+        compression_flag = read_be(buffer, 5, UInt32)
+        compression = NoCompression
+        if compression_flag != 0x0000FFFF
+            buffer, compression = decompress_bytes(buffer, RecordSizeType)
+        end
         # Parse CDF header
         cdr = CDR(buffer, 9, RecordSizeType)
         gdr = GDR(buffer, cdr.gdr_offset, RecordSizeType)
@@ -98,3 +100,15 @@ function Base.keys(cdf::CDFDataset)
 end
 
 Base.haskey(cdf::CDFDataset, var_name::String) = var_name in keys(cdf)
+
+Base.iterate(cdf::CDFDataset, state = 1) = state > length(cdf) ? nothing : (cdf[keys(cdf)[state]], state + 1)
+
+function Base.show(io::IO, ::MIME"text/plain", cdf::CDFDataset)
+    println(io, typeof(cdf), ":", cdf.filename)
+    println(io, "variables")
+    for var in keys(cdf)
+        println(io, "  $var")
+    end
+    println(io, cdf.cdr)
+    return
+end
