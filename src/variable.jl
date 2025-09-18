@@ -1,10 +1,10 @@
 abstract type AbstractVariable{T, N} <: AbstractArray{T, N} end
 
-struct CDFVariable{T, N, A <: AbstractArray{T, N}, V} <: AbstractVariable{T, N}
+struct CDFVariable{T, N, A <: AbstractArray{T, N}, V, P} <: AbstractVariable{T, N}
     name::String
     data::A
     vdr::V
-    parentdataset::CDFDataset
+    parentdataset::P
 end
 
 
@@ -39,4 +39,10 @@ end
 function Base.haskey(var::CDFVariable, name::String)
     at = vattrib(var.parentdataset, var.vdr.num, name)
     return !isnothing(at)
+end
+
+function CPR(var::CDFVariable)
+    vdr = var.vdr
+    cdf = var.parentdataset
+    return CPR(parent(cdf), vdr.cpr_or_spr_offset, recordsize_type(cdf))
 end

@@ -36,9 +36,6 @@ println("Variables: ", keys(cdf))
 
 # Access a variable
 var = cdf["temperature"]
-println("Variable data: ", var.data)
-println("Data type: ", var.data_type)
-println("Dimensions: ", var.dimensions)
 ```
 
 ## Elsewhere
