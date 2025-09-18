@@ -1,33 +1,38 @@
 module CommonDataFormat
 
-using Dates
+using Dates, UnixTimes
+using Mmap
+using Dictionaries
+using StaticStrings
 
-export CDFDataset, CDFAttribute, CDFVariable, varget, attrget
+export CDFDataset, CDFVariable
 export Majority, CompressionType, DataType
+export Epoch, Epoch16, TT2000
 
+include("epochs.jl")
 include("enums.jl")
 include("parsing.jl")
 include("records/records.jl")
-include("variable.jl")
-include("attribute.jl")
 include("dataset.jl")
-include("loading/vxr.jl")
-include("loading/vvr.jl")
-include("loading/variable.jl")
+include("variable.jl")
 include("loading/attribute.jl")
-
+include("loading/variable.jl")
 
 """
-    attrget(cdf::CDF, attribute_name::String) -> Vector{Any}
+    attrib(cdf::CDFDataset, attribute_name::String)
 
-Retrieve a global attribute from the CDF file.
+Retrieve all entries for a named attribute from the CDF file.
 """
-function attrget(cdf::CDFDataset, attribute_name::String)
-    if !haskey(cdf.attributes, attribute_name)
-        error("Attribute '$attribute_name' not found in CDF file")
+function attrib(cdf::CDFDataset, name::String)
+    RecordSizeType = recordsize_type(cdf)
+    buffer = cdf.buffer
+    cdf_encoding = cdf.cdr.encoding
+    offsets = get_offsets(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    for offset in offsets
+        adr = ADR(buffer, offset, RecordSizeType)
+        name == String(adr.Name) && return load_attribute_entries(buffer, adr, RecordSizeType, cdf_encoding)
     end
-
-    return cdf.attributes[attribute_name].entries
+    error("Attribute '$name' not found in CDF file")
 end
 
 end

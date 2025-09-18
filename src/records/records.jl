@@ -19,77 +19,21 @@ end
     return Header(record_size, record_type)
 end
 
+@inline function Header(buf::Vector{UInt8}, pos, RecordSizeType)
+    record_size = Int64(read_be(buf, pos, RecordSizeType))
+    record_type = read_be(buf, pos + sizeof(RecordSizeType), Int32)
+    return Header(record_size, record_type)
+end
+
 include("cdr.jl")
 include("vdr.jl")
+include("vxr.jl")
 include("adr.jl")
+include("aedr.jl")
 include("gdr.jl")
+include("vvr.jl")
 
-"""
-z-Variable Descriptor Record (zVDR)
-"""
-struct zVDR{DT}
-    header::Header
-    vdr_next::Int64     # Offset to next VDR in chain
-    data_type::DT    # CDF data type
-    max_rec::Int32       # Maximum record number (-1 if none)
-    vxr_head::Int64     # Variable indeX Record head
-    vxr_tail::Int64     # Variable indeX Record tail
-    flags::UInt32        # Variable flags
-    s_records::UInt32    # Sparse records flag
-    rfu_b::UInt32        # Reserved field B
-    rfu_c::UInt32        # Reserved field C
-    rfu_f::UInt32        # Reserved field F
-    num_elems::UInt32    # Number of elements (for strings)
-    num::UInt32          # Variable number
-    cpr_or_spr_offset::UInt64  # Compression/Sparseness Parameters Record offset
-    blocking_factor::UInt32
-    name::String         # Variable name
-    z_num_dims::UInt32   # Number of dimensions (z-variables only)
-    z_dim_sizes::Vector{UInt32}  # Dimension sizes (z-variables only)
-    dim_varys::Vector{UInt32}    # Dimension variance flags
-end
-
-
-@inline function zVDR(io::IO, args...)
-    vdr = VDR(io, args...)
-    z_num_dims = read_uint32_be(io)
-
-    # Read dimension sizes
-    z_dim_sizes = Vector{UInt32}(undef, z_num_dims)
-    dim_varys = Vector{UInt32}(undef, z_num_dims)
-    for i in eachindex(z_dim_sizes)
-        z_dim_sizes[i] = read_uint32_be(io)
-    end
-    # Read dimension variance flags
-    for i in eachindex(dim_varys)
-        dim_varys[i] = read_uint32_be(io)
-    end
-
-    return zVDR(vdr..., z_num_dims, z_dim_sizes, dim_varys)
-end
-
-"""
-Variable Index Record (VXR) - contains pointers to variable data records
-"""
-struct VXR
-    header::Header
-    vxr_next::UInt64        # Next VXR in chain
-    n_entries::UInt32       # Number of entries
-    n_used_entries::UInt32  # Number of used entries
-    first::Vector{UInt32}   # First record numbers
-    last::Vector{UInt32}    # Last record numbers
-    offset::Vector{UInt64}  # Offsets to VVR/CVVR records
-end
-
-"""
-Variable Value Record (VVR) - contains actual variable data
-"""
-struct VVR{T}
-    header::Header
-    data::Vector{T}     # Raw variable data
-end
-
-for R in (:ADR, :CDR, :GDR, :VXR, :VDR)
+for R in (:ADR, :AEDR, :GDR, :VDR)
     @eval begin
         @inline function $R(io::IO, offset, RecordSizeType)
             seek(io, offset)

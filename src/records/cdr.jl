@@ -22,17 +22,17 @@ Majority(cdr::CDR) = (cdr.flags & 0x01) != 0 ? Majority(0) : Majority(1)  # Row=
 is_cdf_v3(cdr::CDR) = cdr.version == 3
 
 """
-    CDR(io::IO, RecordSizeType) -> CDR
+    CDR(buffer, pos, RecordSizeType)
 
 Load a CDF Descriptor Record from the IO stream at the specified offset.
 This follows the CDF specification for CDR record structure.
 """
-@inline function CDR(io::IO, RecordSizeType)
-    # Read header
-    header = Header(io, RecordSizeType)
+@inline function CDR(buffer::Vector{UInt8}, pos, RecordSizeType)
+    header = Header(buffer, pos, RecordSizeType)
     @assert header.record_type == 1 "Invalid CDR record type"
+    pos += sizeof(RecordSizeType) + 4
     # Read remaining CDR fields in order as per CDF specification
-    gdr_offset = read_be(io, RecordSizeType)
-    fields = read_be(io, 9, Int32)
+    gdr_offset, pos = read_be_i(buffer, pos, RecordSizeType)
+    fields = read_be(buffer, pos, 9, Int32)
     return CDR(header, gdr_offset, fields...)
 end

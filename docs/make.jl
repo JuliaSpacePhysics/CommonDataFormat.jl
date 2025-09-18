@@ -17,5 +17,5 @@ makedocs(;
 
 deploydocs(;
     repo="github.com/JuliaSpacePhysics/CommonDataFormat.jl",
-    devbranch="main",
+    push_preview = true,
 )
