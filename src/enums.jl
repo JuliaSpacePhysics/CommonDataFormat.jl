@@ -68,8 +68,7 @@ const type_map = Dict(
     CDF_TIME_TT2000 => TT2000
 )
 
-function julia_type(cdf_type)
-    return type_map[cdf_type]
+function julia_type(cdf_type, num_elems)
+    cdf_type = DataType(cdf_type)
+    return cdf_type in (CDF_CHAR, CDF_UCHAR) ? StaticString{Int(num_elems)} : type_map[cdf_type]
 end
-
-julia_type(i::Integer) = julia_type(DataType(i))

@@ -25,6 +25,8 @@ end
     return Header(record_size, record_type)
 end
 
+get_record_type(buffer, offset, FieldSizeT) = read_be(buffer, offset + sizeof(FieldSizeT) + 1, Int32)
+
 @inline function check_record_type(record_type, buffer, offset, FieldSizeT)
     pos = offset + sizeof(FieldSizeT) + 1
     header_type = read_be(buffer, pos, Int32)

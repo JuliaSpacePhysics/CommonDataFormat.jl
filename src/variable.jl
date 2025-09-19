@@ -1,21 +1,51 @@
-abstract type AbstractVariable{T, N} <: AbstractArray{T, N} end
+abstract type AbstractVariable{T, N} <: DiskArrays.AbstractDiskArray{T, N} end
 
-struct CDFVariable{T, N, A <: AbstractArray{T, N}, V, P} <: AbstractVariable{T, N}
+struct VVREntry
+    first::Int
+    last::Int
+    offset::Int
+end
+
+Base.length(entry::VVREntry) = entry.last - entry.first + 1
+
+struct CDFVariable{T, N, V, P} <: AbstractVariable{T, N}
     name::String
-    data::A
     vdr::V
     parentdataset::P
+    dims::NTuple{N, Int}
+    record_size::Int
+    vvrs::Vector{VVREntry}
+    compression::CompressionType
+    byte_swap::Bool
 end
 
+Base.size(var::CDFVariable) = var.dims
 
-Base.parent(var::AbstractVariable) = var.data
-Base.iterate(var::AbstractVariable, args...) = iterate(parent(var), args...)
-for f in (:size, :Array)
-    @eval Base.$f(var::AbstractVariable) = $f(parent(var))
+function dst_src_ranges(first, last, entry)
+    overlap_first = max(first, entry.first)
+    overlap_last = min(last, entry.last)
+    local_first = overlap_first - entry.first + 1
+    local_last = overlap_last - entry.first + 1
+    dest_first = overlap_first - first + 1
+    dest_last = overlap_last - first + 1
+    return (dest_first:dest_last, local_first:local_last)
 end
 
-for f in (:getindex,)
-    @eval Base.@propagate_inbounds Base.$f(var::AbstractVariable, I::Vararg{Int}) = $f(parent(var), I...)
+DiskArrays.haschunks(::CDFVariable) = DiskArrays.Chunked()
+function DiskArrays.eachchunk(var::CDFVariable)
+    N = ndims(var)
+    chunks = ntuple(N) do i
+        if i != N
+            DiskArrays.RegularChunks(var.dims[i], 0, var.dims[i])
+        else
+            chunksizes = length.(var.vvrs)
+            if length(var.vvrs) > 0
+                chunksizes[end] = @views var.dims[N] - sum(chunksizes[1:end-1])
+            end
+            DiskArrays.IrregularChunks(chunksizes = chunksizes)
+        end
+    end
+    return DiskArrays.GridChunks(chunks)
 end
 
 function Base.getproperty(var::CDFVariable, name::Symbol)
@@ -29,7 +59,6 @@ function Base.getproperty(var::CDFVariable, name::Symbol)
     end
 end
 
-# Get the corresponding metadata
 function Base.getindex(var::CDFVariable, name::String)
     at = vattrib(var.parentdataset, var.vdr.num, name)
     isnothing(at) && throw(KeyError(name))
@@ -37,8 +66,7 @@ function Base.getindex(var::CDFVariable, name::String)
 end
 
 function Base.haskey(var::CDFVariable, name::String)
-    at = vattrib(var.parentdataset, var.vdr.num, name)
-    return !isnothing(at)
+    return !isnothing(vattrib(var.parentdataset, var.vdr.num, name))
 end
 
 attrib(var::CDFVariable, name::String) = vattrib(var.parentdataset, var.vdr.num, name)

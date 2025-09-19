@@ -24,7 +24,7 @@ end
 @inline function load_aedr_data(buffer::Vector{UInt8}, offset, RecordSizeType, cdf_encoding)
     datatype = read_be(buffer, offset + 25, Int32)
     NumElems = read_be(buffer, offset + 33, Int32)
-    T = julia_type(datatype)
+    T = julia_type(datatype, NumElems)
     return if datatype in (CDF_CHAR, CDF_UCHAR)
         load_char_data(buffer, offset + 57, NumElems)
     else
