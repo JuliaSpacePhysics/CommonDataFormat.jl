@@ -41,6 +41,8 @@ function Base.haskey(var::CDFVariable, name::String)
     return !isnothing(at)
 end
 
+attrib(var::CDFVariable, name::String) = vattrib(var.parentdataset, var.vdr.num, name)
+
 function CPR(var::CDFVariable)
     vdr = var.vdr
     cdf = var.parentdataset

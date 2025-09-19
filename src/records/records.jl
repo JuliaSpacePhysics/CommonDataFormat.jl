@@ -13,16 +13,23 @@ struct Header
     record_type::Int32
 end
 
-@inline function Header(io::IO, RecordSizeType)
-    record_size = Int64(read_be(io, RecordSizeType))
+@inline function Header(io::IO, FieldSizeT)
+    record_size = Int64(read_be(io, FieldSizeT))
     record_type = read_be(io, Int32)
     return Header(record_size, record_type)
 end
 
-@inline function Header(buf::Vector{UInt8}, pos, RecordSizeType)
-    record_size = Int64(read_be(buf, pos, RecordSizeType))
-    record_type = read_be(buf, pos + sizeof(RecordSizeType), Int32)
+@inline function Header(buf::Vector{UInt8}, pos, FieldSizeT)
+    record_size = Int64(read_be(buf, pos, FieldSizeT))
+    record_type = read_be(buf, pos + sizeof(FieldSizeT), Int32)
     return Header(record_size, record_type)
+end
+
+@inline function check_record_type(record_type, buffer, offset, FieldSizeT)
+    pos = offset + sizeof(FieldSizeT) + 1
+    header_type = read_be(buffer, pos, Int32)
+    @assert header_type == record_type
+    return pos + sizeof(Int32)
 end
 
 include("cdr.jl")
@@ -72,8 +79,8 @@ function Base.show(io::IO, cdr::CDR)
     flag_info = decode_cdr_flags(cdr.flags)
 
     println(io, "CDR (CDF Descriptor Record):")
-    println(io, "  Record Size: $(cdr.header.record_size) bytes")
-    println(io, "  Record Type: $(cdr.header.record_type)")
+    # println(io, "  Record Size: $(cdr.header.record_size) bytes")
+    # println(io, "  Record Type: $(cdr.header.record_type)")
     println(io, "  GDR Offset: 0x$(string(cdr.gdr_offset, base = 16, pad = 8))")
     println(io, "  Version: $(cdr.version).$(cdr.release).$(cdr.increment)")
     println(io, "  Encoding: $(cdr.encoding)")

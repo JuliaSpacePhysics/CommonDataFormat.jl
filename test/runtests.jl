@@ -4,6 +4,7 @@ import CommonDataFormat as CDF
 
 include("utils.jl")
 include("comprehensive_test.jl")
+include("CommonDataModelExt_test.jl")
 
 @testset "Uncompressed cdf file" begin
     file = data_path("a_cdf.cdf")
@@ -62,4 +63,11 @@ end
     file = data_path("ge_h0_cpi_00000000_v01.cdf")
     ds = CDFDataset(file)
     @test ds["label_v3c"] == ["Ion Vx GSE    " ; "Ion Vy GSE    " ; "Ion Vz GSE    ";;]
+end
+
+@testset "Epochs" begin
+    @test string(Epoch(-1.0e31)) == "FILLVAL"
+    @test string(TT2000(0)) == "2000-01-01T11:58:55.816"
+    @test TT2000(0) == TT2000(0) |> bswap
+    @test TT2000(0) == DateTime("2000-01-01T11:58:55.816")
 end

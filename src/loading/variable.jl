@@ -37,14 +37,17 @@ function load_variable_data(source, vxr_head, ::Type{T}, dims, ::Type{RecordSize
     return reshape(data, dims)
 end
 
-function read_variable_data!(data::Vector{T}, source, vvrs, compression, record_size, RecordSizeType; nbuffers = nthreads()) where {T}
+function read_variable_data!(data::Vector{T}, source, vvrs, compression, record_size, ::Type{FieldSizeT}; nbuffers = nthreads()) where {T, FieldSizeT}
     pos = 1
     if compression == NoCompression || first(vvrs).RecordType == VVR_ # vvr records is the ultimative source
         for entry in vvrs
             N = min(length(data) - pos + 1, length(entry) * record_size)
-            load_vvr_data!(data, pos, source, entry.offset, N, RecordSizeType)
+            load_vvr_data!(data, pos, source, entry.offset, N, FieldSizeT)
             pos += N
         end
+    elseif length(vvrs) == 1
+        load_cvvr_data!(data, 1, source, vvrs[1].offset, length(data), FieldSizeT, compression)
+        pos = length(data) + 1
     else
         n_ch = min(nbuffers, length(vvrs))
         chnl = Channel{Decompressor}(n_ch)
@@ -54,7 +57,7 @@ function read_variable_data!(data::Vector{T}, source, vvrs, compression, record_
         Base.@inbounds Threads.@threads for i in eachindex(vvrs)
             decompressor = take!(chnl)
             N = Ns[i]
-            load_cvvr_data!(data, positions[i] + 1, source, vvrs[i].offset, N, RecordSizeType, compression; decompressor)
+            load_cvvr_data!(data, positions[i] + 1, source, vvrs[i].offset, N, FieldSizeT, compression; decompressor)
             put!(chnl, decompressor)
         end
         pos = positions[end] + 1
@@ -69,17 +72,18 @@ function read_vvrs(src, vxr_head, RecordSizeType)
     return entries
 end
 
-function collect_vxr_entries!(entries::Vector{VVREntry}, src::Vector{UInt8}, offset, RecordSizeType)
+function collect_vxr_entries!(entries::Vector{VVREntry}, src::Vector{UInt8}, offset, ::Type{FieldSizeT}) where FieldSizeT
     while offset != 0
-        vxr = VXR(src, offset, RecordSizeType)
-        foreach(vxr.first, vxr.last, vxr.offset) do first_rec, last_rec, raw_offset
-            leaf_offset = Int(raw_offset)
-            record_type = Header(src, leaf_offset + 1, RecordSizeType).record_type
+
+        vxr = VXR(src, offset, FieldSizeT)
+        for (first, last, offset) in vxr
+            leaf_offset = Int(offset)
+            record_type = Header(src, leaf_offset + 1, FieldSizeT).record_type
             @assert record_type in (VVR_, CVVR_, VXR_)
             if record_type == VXR_
-                collect_vxr_entries!(entries, src, leaf_offset, RecordSizeType)
+                collect_vxr_entries!(entries, src, leaf_offset, FieldSizeT)
             else
-                push!(entries, VVREntry(record_type, first_rec, last_rec, leaf_offset))
+                push!(entries, VVREntry(record_type, Int(first), Int(last), leaf_offset))
             end
         end
         offset = Int(vxr.vxr_next)
