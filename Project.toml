@@ -1,7 +1,7 @@
 name = "CommonDataFormat"
 uuid = "a9737db6-c05c-4e48-868b-6bc41491d9d9"
-version = "0.1.1"
 authors = ["Beforerr <zzj956959688@gmail.com> and contributors"]
+version = "0.1.1"
 
 [deps]
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
@@ -20,6 +20,7 @@ CommonDataFormatCommonDataModelExt = ["CommonDataModel"]
 
 [compat]
 CodecZlib = "0.7"
+CommonDataModel = "0.4"
 Dates = "1"
 Dictionaries = "0.4"
 LibDeflate = "0.4.3"
