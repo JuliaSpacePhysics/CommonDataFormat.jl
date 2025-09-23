@@ -46,7 +46,7 @@ function decompress_bytes!(decompressor, dest, doffs, src::AbstractVector{UInt8}
     in_ptr = pointer(src, soffs)
     return if compression == GzipCompression
         out = _unsafe_gzip_decompress!(decompressor, out_ptr, n_out, in_ptr, n_in)
-        @assert !(out isa LibDeflateError) out
+        @assert !(out isa LibDeflateError)
     elseif compression == RLECompression
     end
 end

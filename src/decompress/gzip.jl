@@ -2,7 +2,7 @@
 function _unsafe_gzip_decompress!(
         decompressor::Decompressor,
         out_ptr,
-        n_out,
+        max_outlen,
         in_ptr::Ptr,
         len::Integer,
         extra_data = nothing,
@@ -22,8 +22,7 @@ function _unsafe_gzip_decompress!(
 
     compressed_len = len - UInt(8) - header_len
     uncompressed_size = ltoh(unsafe_load(Ptr{UInt32}(in_ptr + len - UInt(4))))
-    uncompressed_size != n_out && return LibDeflateErrors.deflate_bad_payload
-
+    uncompressed_size > max_outlen && return LibDeflateErrors.deflate_insufficient_space
     # Now DEFLATE decompress
     decomp_result = unsafe_decompress!(
         Base.HasLength(),

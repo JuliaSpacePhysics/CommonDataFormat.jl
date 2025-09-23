@@ -26,16 +26,19 @@ CDM.name(var::CDFVariable) = var.name
 CDM.dataset(var::CDFVariable) = var.parentdataset
 CDM.attribnames(var::CDFVariable) = keys(CDF.attrib(var))
 CDM.attrib(var::CDFVariable, args...) = CDF.attrib(var, args...)
-@inline function CDM.dimnames(var::CDFVariable, i)
-    @assert i <= ndims(var) DimensionMismatch()
-    key = if i == 1
+function CDM.dimnames(var::CDFVariable, i)
+    N = ndims(var)
+    @assert i <= N
+    key = if i == N
         "DEPEND_0"
-    elseif i == 2
+    elseif i == 1
         "DEPEND_1"
-    elseif i == 3
+    elseif i == 2
         "DEPEND_2"
+    else
+        "DEPEND_$i"
     end
-    return CDF.attrib(var, key)
+    return CDF.attrib(var, key)::Union{String, Nothing}
 end
 
 end
