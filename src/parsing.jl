@@ -14,6 +14,10 @@
     end
 end
 
+@inline function read_be(p::Ptr{T}, i) where T
+    return ntoh(unsafe_load(p + (i - 1) * sizeof(T)))
+end
+
 @inline function read_be(v::Vector{UInt8}, i, n, T)
     S = sizeof(T)
     return ntuple(j -> read_be(v, i + (j - 1) * S, T), n)

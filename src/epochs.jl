@@ -45,6 +45,10 @@ struct TT2000 <: CDFDateTime
     value::Int64
 end
 
+fillvalue(::Epoch) = -1.0e31
+fillvalue(::Epoch16) = -1.0e31
+fillvalue(::TT2000) = 9999
+
 # Conversion to DateTime
 function Dates.DateTime(epoch::Epoch)
     return DateTime(0) + Millisecond(round(Int64, epoch.value))
@@ -88,7 +92,16 @@ for f in (:year, :month, :day, :hour, :minute, :second, :millisecond)
     @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(DateTime(epoch))
 end
 
-Base.show(io::IO, epoch::CDFDateTime) = print(io, typeof(epoch), "(", DateTime(epoch), ")")
+Dates.value(epoch::CDFDateTime) = epoch.value
+
+function Base.show(io::IO, epoch::CDFDateTime)
+    fillval = fillvalue(epoch)
+    if fillval == epoch.value
+        print(io, "FILLVAL")
+    else
+        print(io, DateTime(epoch))
+    end
+end
 Base.promote_rule(::Type{<:CDFDateTime}, ::Type{Dates.DateTime}) = Dates.DateTime
 Base.convert(::Type{Dates.DateTime}, x::CDFDateTime) = Dates.DateTime(x)
 Base.bswap(x::T) where {T <: CDFDateTime} = T(Base.bswap(x.value))

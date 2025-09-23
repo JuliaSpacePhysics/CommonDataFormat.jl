@@ -33,7 +33,7 @@ function CDFDataset(filename)
             buffer, compression = decompress_bytes(buffer, RecordSizeType)
         end
         # Parse CDF header
-        cdr = CDR(buffer, 9, RecordSizeType)
+        cdr = CDR(buffer, 8, RecordSizeType)
         gdr = GDR(buffer, cdr.gdr_offset, RecordSizeType)
         return CDFDataset{compression, RecordSizeType}(filename, cdr, gdr, buffer)
     end
@@ -63,10 +63,11 @@ function find_vdr(cdf::CDFDataset, var_name::String)
     gdr = GDR(cdf)
     RecordSizeType = recordsize_type(cdf)
     buffer = cdf.buffer
+    var_name_bytes = codeunits(var_name)
     for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
         while current_offset != 0
             vdr = zVDR(buffer, current_offset, RecordSizeType)
-            if String(vdr.name) == var_name
+            if vdr.name == var_name_bytes
                 return vdr
             end
             current_offset = vdr.vdr_next
