@@ -3,6 +3,7 @@ module CommonDataFormat
 using Dates, UnixTimes
 using Mmap
 using Dictionaries
+using DiskArrays
 using StaticStrings
 using Base.Threads
 using CodecZlib: GzipDecompressor, transcode

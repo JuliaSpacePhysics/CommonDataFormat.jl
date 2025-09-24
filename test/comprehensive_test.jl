@@ -11,7 +11,7 @@ Tests all variables in a_cdf.cdf for expected shapes, types, values, and attribu
 """
 
 # Expected variable definitions (translated from Python test.py)
-const EXPECTED_VARIABLES = IdDict(
+const EXPECTED_VARIABLES = Dict(
     "epoch" => (
         shape = (101,),
         data_type = "CDF_EPOCH",
@@ -138,7 +138,7 @@ end
             var = ds[var_name]
             @test size(var) == expected.shape
             @test string(var.datatype) == expected.data_type
-            @test var == expected.values
+            @test Array(var) == expected.values
             @test var.attrib == expected.attributes
         end
     end
@@ -151,11 +151,11 @@ end
             var = ds[var_name]
             @test size(var) == expected.shape
             @test string(var.datatype) == expected.data_type
-            # Test values (if specified)
+            # # Test values (if specified)
             if eltype(var) <: Number
-                @test var ≈ expected.values
+                @test Array(var) ≈ expected.values
             else
-                @test var == expected.values
+                @test Array(var) == expected.values
             end
             @test var.attrib == expected.attributes
         end

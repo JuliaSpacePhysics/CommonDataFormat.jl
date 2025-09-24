@@ -2,7 +2,7 @@
 Variable Index Record (VXR) - contains pointers to variable data records
 """
 struct VXR
-    header::Header
+    # header::Header
     vxr_next::Int64        # Next VXR in chain
     n_entries::Int32       # Number of entries
     n_used_entries::Int32  # Number of used entries
@@ -18,17 +18,13 @@ end
 
 Load a Variable Index Record from the source at the specified offset.
 """
-function VXR(source::Vector{UInt8}, offset, RecordSizeType)
-    pos = offset + 1
-    header = Header(source, pos, RecordSizeType)
-    @assert header.record_type == 6 "Invalid VXR record type"
-    pos += sizeof(RecordSizeType) + 4
-    # Read VXR fields
-    vxr_next, pos = read_be_i(source, pos, RecordSizeType)
+function VXR(source::Vector{UInt8}, offset, FieldSizeT)
+    pos = check_record_type(6, source, offset, FieldSizeT)
+    vxr_next, pos = read_be_i(source, pos, FieldSizeT)
     n_entries, pos = read_be_i(source, pos, Int32)
     n_used_entries, pos = read_be_i(source, pos, Int32)
     p = convert(Ptr{Int32}, pointer(source, pos))
-    return VXR(header, vxr_next, n_entries, n_used_entries, p)
+    return VXR(vxr_next, n_entries, n_used_entries, p)
 end
 
 function Base.iterate(vxr::VXR, state = 1)
@@ -38,5 +34,5 @@ function Base.iterate(vxr::VXR, state = 1)
     last = read_be(pointer, state + vxr.n_entries)
     offset_pointer = convert(Ptr{Int64}, pointer + (2 * vxr.n_entries) * sizeof(Int32))
     offset = read_be(offset_pointer, state)
-    return ((first, last, offset), state + 1)
+    return ((first, last, Int(offset)), state + 1)
 end
