@@ -4,7 +4,7 @@ Attribute Descriptor Record (ADR)
 Contains a description of an attribute in a CDF. There will be one ADR per attribute. The ADRhead field of the ADR contains the file offset of the first ADR.
 """
 struct ADR{S} <: Record
-    header::Header
+    # header::Header
     ADRnext::Int64    # Offset to next ADR in chain
     AgrEDRhead::Int64    # The offset of the first Attribute g/rEntry Descriptor Record (AgrEDR) for this attribute.
     Scope::Int32     # 1 = global, 2 = variable
@@ -40,9 +40,7 @@ Load an Attribute Descriptor Record from the IO stream at the specified offset.
     fields2 = read_be(io, 3, Int32)
     name = readname(io)
 
-    return ADR(
-        header, ADRnext, AgrEDRhead, fields1..., AzEDRhead, fields2..., name
-    )
+    return ADR(ADRnext, AgrEDRhead, fields1..., AzEDRhead, fields2..., name)
 end
 
 """
@@ -56,9 +54,7 @@ Load an Attribute Descriptor Record from the buffer at the specified position.
     @assert header.record_type == 4
     pos += sizeof(RecordSizeType) + 4
     # Read ADR fields
-    fields, pos = @read_be_fields(buffer, pos, fieldtypes(ADR)[2:(end - 1)]...)
+    fields, pos = @read_be_fields(buffer, pos, fieldtypes(ADR)[1:(end - 1)]...)
     name = readname(buffer, pos)
-    return ADR(
-        header, fields..., name
-    )
+    return ADR(fields..., name)
 end
