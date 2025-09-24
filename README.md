@@ -9,7 +9,8 @@ A Julia package for reading Common Data Format (CDF) files, widely used in space
 ## Features
 
 - **Pure Julia implementation** - No external dependencies on CDF libraries
-- **Efficient data access** - Lazy memory-mapped access for data and attributes, super fast decompression using [`LibDeflate`](https://github.com/jakobnissen/LibDeflate.jl)
+- **Efficient data access** - Memory-mapped access for data and attributes, super fast decompression using [`LibDeflate`](https://github.com/jakobnissen/LibDeflate.jl)
+- **[DiskArrays.jl](https://github.com/JuliaIO/DiskArrays.jl) integration** - Lazy representation of data on hard disk with AbstractDiskArray interface
 
 ## Installation
 

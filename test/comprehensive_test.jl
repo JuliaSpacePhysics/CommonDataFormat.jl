@@ -172,8 +172,9 @@ const EXPECTED_GLOBAL_ATTRIBUTES = Dict{String, Any}(
 )
 
 @testset "Global Attributes" begin
+    attribs = ds.attrib
     for (attr_name, expected_value) in EXPECTED_GLOBAL_ATTRIBUTES
-        actual_value = ds.attrib[attr_name]
-        @test actual_value == expected_value
+        @test CDF.attrib(ds, attr_name) == expected_value
+        @test attribs[attr_name] == expected_value
     end
 end
