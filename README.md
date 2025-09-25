@@ -4,7 +4,7 @@
 [![Build Status](https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/JuliaSpacePhysics/CommonDataFormat.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/JuliaSpacePhysics/CommonDataFormat.jl)
 
-A Julia package for reading Common Data Format (CDF) files, widely used in space physics for storing multidimensional data arrays and metadata.
+A Julia package for reading Common Data Format (CDF) files, widely used in space physics for storing multidimensional data arrays and metadata. See [CDFDatasets.jl](https://github.com/JuliaSpacePhysics/CDFDatasets.jl) for a high-level interface.
 
 ## Features
 
@@ -43,3 +43,7 @@ var = cdf["temperature"]
 
 - [CDFpp](https://github.com/SciQLop/CDFpp): A modern C++ header only cdf library with Python bindings
 - [cdflib](https://github.com/MAVENSDC/cdflib): A python module for reading and writing NASA's Common Data Format (cdf) files
+
+## Reference
+
+- [CDF Internal Format Description](https://spdf.gsfc.nasa.gov/pub/software/cdf/doc/cdfifd.pdf)

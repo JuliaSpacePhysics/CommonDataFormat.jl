@@ -14,7 +14,7 @@
     end
 end
 
-@inline function read_be(p::Ptr{T}, i) where T
+@inline function read_be(p::Ptr{T}, i) where {T}
     return ntoh(unsafe_load(p + (i - 1) * sizeof(T)))
 end
 
@@ -146,3 +146,7 @@ end
 
 _btye_swap!(data) = map!(ntoh, data, data)
 _btye_swap!(data::AbstractArray{StaticString{N}}) where {N} = data
+# function _btye_swap!(data::AbstractArray{TT2000})
+#     rd = reinterpret(Int64, data)
+#     return map!(ntoh, rd, rd)
+# end

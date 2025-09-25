@@ -162,6 +162,12 @@ end
     end
 end
 
+@testset "Variable Varying" begin
+    @test is_record_varying(ds["var"])
+    @test is_record_varying(ds["var_recvary_string"])
+    @test !is_record_varying(ds["var_string"])
+end
+
 # Expected global attributes (translated from Python test.py)
 const EXPECTED_GLOBAL_ATTRIBUTES = Dict{String, Any}(
     "attr" => ["a cdf text attribute"],

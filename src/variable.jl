@@ -50,9 +50,9 @@ end
 
 function Base.getproperty(var::CDFVariable, name::Symbol)
     name in fieldnames(CDFVariable) && return getfield(var, name)
-    if name === :attrib
+    if name == :attrib
         return vattrib(var.parentdataset, var.vdr.num)
-    elseif name === :datatype
+    elseif name == :datatype
         return DataType(var.vdr.data_type)
     else
         throw(ArgumentError("Unknown property $name"))
@@ -70,9 +70,12 @@ function Base.haskey(var::CDFVariable, name::String)
 end
 
 attrib(var::CDFVariable, name::String) = vattrib(var.parentdataset, var.vdr.num, name)
+attrib(var::CDFVariable) = vattrib(var.parentdataset, var.vdr.num)
 
 function CPR(var::CDFVariable)
     vdr = var.vdr
     cdf = var.parentdataset
     return CPR(parent(cdf), vdr.cpr_or_spr_offset, recordsize_type(cdf))
 end
+
+is_record_varying(v::CDFVariable) = is_record_varying(v.vdr)

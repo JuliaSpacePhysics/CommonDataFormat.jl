@@ -5,7 +5,7 @@
 # 2. CDF_EPOCH16 is picoseconds since Year 0 represented as 2-doubles,
 # 3. CDF_TIME_TT2000 (TT2000 as short) is nanoseconds since J2000 with leap seconds
 
-import Base: promote_rule
+import Base: promote_rule, -, +
 
 include("leap_second.jl")
 
@@ -21,7 +21,7 @@ Milliseconds since Year 0 (01-Jan-0000 00:00:00.000)
 Represented as a single double.
 """
 struct Epoch <: CDFDateTime
-    value::Float64
+    instant::Float64
 end
 
 """
@@ -42,16 +42,25 @@ Nanoseconds since J2000 (01-Jan-2000 12:00:00.000.000.000)
 with leap seconds, represented as an 8-byte integer.
 """
 struct TT2000 <: CDFDateTime
-    value::Int64
+    instant::Nanosecond
 end
+
+
+TT2000(instant::Int64) = TT2000(Nanosecond(instant))
+
+TT2000(dt::TimeType) = convert(TT2000, dt)
+Epoch(dt::TimeType) = convert(Epoch, dt)
 
 fillvalue(::Epoch) = -1.0e31
 fillvalue(::Epoch16) = -1.0e31
 fillvalue(::TT2000) = 9999
 
+(-)(epoch::Epoch, other::Epoch) = Millisecond(round(Int64, epoch.instant - other.instant))
+(+)(tt2000::TT2000, other::Period) = TT2000(tt2000.instant.value + Dates.tons(other))
+
 # Conversion to DateTime
 function Dates.DateTime(epoch::Epoch)
-    return DateTime(0) + Millisecond(round(Int64, epoch.value))
+    return DateTime(0) + Millisecond(round(Int64, epoch.instant))
 end
 
 function Dates.DateTime(epoch::Epoch16)
@@ -62,7 +71,7 @@ end
 
 function Dates.DateTime(epoch::TT2000)
     # TT2000 to Unix time with leap second correction
-    ns_from_1970 = epoch.value + TT2000_OFFSET
+    ns_from_1970 = epoch.instant.value + TT2000_OFFSET
     leap_seconds_ns = leap_second(ns_from_1970)
     return DateTime(1970) + Nanosecond(ns_from_1970 - leap_seconds_ns)
 end
@@ -81,22 +90,28 @@ function Epoch16(dt::DateTime)
     return Epoch16(s_total, ps_component)
 end
 
-function TT2000(dt::DateTime)
+function Base.convert(::Type{TT2000}, dt::DateTime)
     ns_since_unix = (dt - DateTime(1970, 1, 1)).value * 1_000_000
     leap_seconds_ns = leap_second(ns_since_unix)
     tt2000_value = ns_since_unix - TT2000_OFFSET + leap_seconds_ns
     return TT2000(tt2000_value)
 end
 
+
 for f in (:year, :month, :day, :hour, :minute, :second, :millisecond)
     @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(DateTime(epoch))
 end
 
-Dates.value(epoch::CDFDateTime) = epoch.value
+Dates.value(epoch::CDFDateTime) = epoch.instant
+Dates.value(epoch::TT2000) = epoch.instant.value
+
+function Base.floor(x::T, p::Union{DatePeriod, TimePeriod}) where {T <: CDFDateTime}
+    convert(T, floor(convert(DateTime, x), p))
+end
 
 function Base.show(io::IO, epoch::CDFDateTime)
     fillval = fillvalue(epoch)
-    if fillval == epoch.value
+    return if fillval == epoch.instant
         print(io, "FILLVAL")
     else
         print(io, DateTime(epoch))
@@ -104,4 +119,5 @@ function Base.show(io::IO, epoch::CDFDateTime)
 end
 Base.promote_rule(::Type{<:CDFDateTime}, ::Type{Dates.DateTime}) = Dates.DateTime
 Base.convert(::Type{Dates.DateTime}, x::CDFDateTime) = Dates.DateTime(x)
-Base.bswap(x::T) where {T <: CDFDateTime} = T(Base.bswap(x.value))
+Base.bswap(x::T) where {T <: CDFDateTime} = T(Base.bswap(x.instant))
+Base.bswap(x::TT2000) = TT2000(Base.bswap(x.instant.value))
