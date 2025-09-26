@@ -19,6 +19,7 @@ export is_record_varying
 
 include("epochs.jl")
 include("enums.jl")
+include("types.jl")
 include("parsing.jl")
 include("decompress.jl")
 include("records/records.jl")

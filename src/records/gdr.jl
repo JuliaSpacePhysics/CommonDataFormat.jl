@@ -2,12 +2,12 @@
 Global Descriptor Record (GDR) - contains global information about the CDF file
 Points to variable and attribute descriptor records
 """
-struct GDR
+struct GDR{FS}
     # header::Header
-    rVDRhead::Int64    # Offset to first r-variable descriptor record
-    zVDRhead::Int64    # Offset to first z-variable descriptor record
-    ADRhead::Int64     # Offset to first attribute descriptor record
-    eof::Int64          # End of file offset
+    rVDRhead::FS    # Offset to first r-variable descriptor record
+    zVDRhead::FS    # Offset to first z-variable descriptor record
+    ADRhead::FS     # Offset to first attribute descriptor record
+    eof::FS          # End of file offset
     NrVars::Int32      # Number of r-variables
     num_attr::Int32     # Number of attributes
     r_max_rec::Int32    # Maximum record number for r-variables
@@ -28,7 +28,7 @@ Load a Global Descriptor Record from the buffer at the specified offset.
 """
 @inline function GDR(buffer::Vector{UInt8}, offset, FieldSizeT)
     pos = check_record_type(2, buffer, offset, FieldSizeT)
-    fields, pos = @read_be_fields(buffer, pos, fieldtypes(GDR)...)
+    fields, pos = read_be_fields(buffer, pos, GDR{FieldSizeT}, Val(1:9))
     # r_num_dims = fields[8]
     # r_dim_sizes = read_be(buffer, pos, r_num_dims, Int32)
     return GDR(fields...)
