@@ -19,13 +19,13 @@ end
 
 Load all attributes from the CDF file.
 """
-function attrib(cdf::CDFDataset; predicate = is_global)
+function attrib(cdf::CDFDataset; predicate=is_global)
     RecordSizeType = recordsize_type(cdf)
     buffer = cdf.buffer
     cdf_encoding = cdf.cdr.encoding
     offsets = get_offsets(buffer, cdf.gdr.ADRhead, RecordSizeType)
     adrs = map(of -> ADR(buffer, of, RecordSizeType), offsets)
-    adrs = filter(predicate, adrs)
+    adrs = filter!(predicate, adrs)
     names = map(adr -> String(adr.Name), adrs)
     aedrs = map(adrs) do adr
         load_attribute_entries(buffer, adr, RecordSizeType, cdf_encoding)
@@ -42,7 +42,7 @@ function attrib(cdf::CDFDataset, name::String)
     RecordSizeType = recordsize_type(cdf)
     buffer = cdf.buffer
     cdf_encoding = cdf.cdr.encoding
-    offsets = get_offsets(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    offsets = get_offsets_lazy(buffer, cdf.gdr.ADRhead, RecordSizeType)
     for offset in offsets
         adr = ADR(buffer, offset, RecordSizeType)
         name == String(adr.Name) && return load_attribute_entries(buffer, adr, RecordSizeType, cdf_encoding)
@@ -59,11 +59,11 @@ function vattrib(cdf::CDFDataset, varnum::Integer)
     RecordSizeType = recordsize_type(cdf)
     buffer = cdf.buffer
     cdf_encoding = cdf.cdr.encoding
-    attributes = Dict{String, Union{String, Vector}}()
-    offsets = get_offsets(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    attributes = Dict{String,Union{String,Vector}}()
+    offsets = get_offsets_lazy(buffer, cdf.gdr.ADRhead, RecordSizeType)
     for offset in offsets
+        is_global(buffer, offset, RecordSizeType) && continue
         adr = ADR(buffer, offset, RecordSizeType)
-        is_global(adr) && continue
         @assert min(adr.AgrEDRhead, adr.AzEDRhead) == 0
         head = max(adr.AgrEDRhead, adr.AzEDRhead)
         found = _search_aedr_entries(buffer, head, RecordSizeType, cdf_encoding, varnum)
@@ -95,11 +95,11 @@ function vattrib(cdf, varnum, name)
     cdf_encoding = cdf.cdr.encoding
 
     # Search for the specific attribute by name first
-    offsets = get_offsets(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    offsets = get_offsets_lazy(buffer, cdf.gdr.ADRhead, RecordSizeType)
     name_bytes = codeunits(name)
     for offset in offsets
+        is_global(buffer, offset, RecordSizeType) && continue
         adr = ADR(buffer, offset, RecordSizeType)
-        is_global(adr) && continue
         adr.Name != name_bytes && continue
         @assert min(adr.AgrEDRhead, adr.AzEDRhead) == 0
         head = max(adr.AgrEDRhead, adr.AzEDRhead)
@@ -127,15 +127,14 @@ end
 
 Return a list of attribute names in the CDF file.
 """
-function attribnames(cdf::CDFDataset; filter = is_global)
+function attribnames(cdf::CDFDataset; predicate=is_global)
     names = String[]
     buffer = cdf.buffer
     RecordSizeType = recordsize_type(cdf)
-    offsets = get_offsets(buffer, cdf.gdr.ADRhead, RecordSizeType)
-    sizehint!(names, length(offsets))
+    offsets = get_offsets_lazy(buffer, cdf.gdr.ADRhead, RecordSizeType)
     for offset in offsets
         adr = ADR(buffer, offset, RecordSizeType)
-        filter(adr) && push!(names, String(adr.Name))
+        predicate(adr) && push!(names, String(adr.Name))
     end
     return names
 end

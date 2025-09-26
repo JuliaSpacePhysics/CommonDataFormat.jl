@@ -20,6 +20,8 @@ struct ADR{FSZ, S} <: Record
 end
 
 is_global(adr) = adr.Scope == 1
+is_global(buffer, offset, ::Type{Int32}) = read_be(buffer, offset + 17, Int32) == 1
+is_global(buffer, offset, ::Type{Int64}) = read_be(buffer, offset + 29, Int32) == 1
 
 
 """
