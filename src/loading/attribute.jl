@@ -69,9 +69,18 @@ function vattrib(cdf::CDFDataset, varnum::Integer)
         found = _search_aedr_entries(buffer, head, RecordSizeType, cdf_encoding, varnum)
         isnothing(found) && continue
         name = String(adr.Name)
-        attributes[name] = found
+        attributes[name] = _get_attributes(name, found, cdf)
     end
     return attributes
+end
+
+# Handle pointers like LABL_PTR_1
+# https://github.com/SciQLop/PyISTP/blob/0a565c39c73dd800934bc379dd7c2e00c28d23d0/pyistp/_impl.py#L16
+function _get_attributes(name, value, cdf)
+    if occursin("LABL_PTR", name)
+        return cdf[value][:]
+    end
+    return value
 end
 
 """
@@ -87,18 +96,18 @@ function vattrib(cdf, varnum, name)
 
     # Search for the specific attribute by name first
     offsets = get_offsets(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    name_bytes = codeunits(name)
     for offset in offsets
         adr = ADR(buffer, offset, RecordSizeType)
         is_global(adr) && continue
-        String(adr.Name) != name && continue
+        adr.Name != name_bytes && continue
         @assert min(adr.AgrEDRhead, adr.AzEDRhead) == 0
         head = max(adr.AgrEDRhead, adr.AzEDRhead)
-        return _search_aedr_entries(buffer, head, RecordSizeType, cdf_encoding, varnum)
+        value = _search_aedr_entries(buffer, head, RecordSizeType, cdf_encoding, varnum)
+        return _get_attributes(name, value, cdf)
     end
     return nothing
 end
-
-attrib(var::CDFVariable) = vattrib(var.parentdataset, var.vdr.num)
 
 function _search_aedr_entries(source, aedr_head::Int64, RecordSizeType, cdf_encoding::Int32, target_varnum::Integer)
     aedr_head == 0 && return nothing

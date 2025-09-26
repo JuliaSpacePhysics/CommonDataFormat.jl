@@ -1,3 +1,24 @@
+@static if isdefined(Base, :OncePerProcess)
+    const decompressors = Base.OncePerProcess{Channel{Decompressor}}() do
+        n_ch = nthreads()
+        chnl = Channel{Decompressor}(n_ch)
+        foreach(i -> put!(chnl, Decompressor()), 1:n_ch)
+        return chnl
+    end
+else
+    const _decompressors = Ref{Union{Channel{Decompressor}, Nothing}}(nothing)
+    function decompressors()
+        if _decompressors[] === nothing
+            n_ch = nthreads()
+            chnl = Channel{Decompressor}(n_ch)
+            foreach(i -> put!(chnl, Decompressor()), 1:n_ch)
+            _decompressors[] = chnl
+        end
+        return _decompressors[]
+    end
+end
+
+
 function variable(cdf::CDFDataset, name)
     source = parent(cdf)
     FieldSizeT = recordsize_type(cdf)
@@ -66,12 +87,9 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
         end
         @assert doffs == length(dest) + 1
     else
-        n_ch = min(nbuffers, end_idx - start_idx + 1)
-        chnl = Channel{Decompressor}(n_ch)
-        foreach(i -> put!(chnl, Decompressor()), 1:n_ch)
         Base.@inbounds Threads.@threads for i in eachindex(start_idx:end_idx)
             entry = entries[i]
-            decompressor = take!(chnl)
+            decompressor = take!(decompressors())
             if is_full_record && entry.first >= first_rec && entry.last <= last_rec
                 # full entry
                 dest_range = dst_src_ranges(first_rec, last_rec, entry)[1]
@@ -89,7 +107,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
                 src_view = view(chunk_array, other_ranges..., local_range)
                 dest_view .= src_view
             end
-            put!(chnl, decompressor)
+            put!(decompressors(), decompressor)
         end
     end
     var.byte_swap && _btye_swap!(dest)
