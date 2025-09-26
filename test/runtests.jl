@@ -21,6 +21,7 @@ end
     @test ds.majority == CDF.Row
     @test ds.compression == CDF.NoCompression
     @test first(ds) == ds["var"]
+    @test occursin("Version: 3.9.0", string(ds))
 end
 
 @testset "Compressed cdf file (gzip)" begin
@@ -59,11 +60,12 @@ end
     @test var[1:3] == Float32[6.7, 6.7, 7.3]
     @test var["UNITS"] == "nT"
     @test var["FIELDNAM"] == "BR (RTN)"
-    @test @allocations(ds["BR"]) <= 60
+    @test @allocations(ds["BR"]) <= 50
+    @info @allocated(ds.attrib)
     if VERSION >= v"1.12"
-        @test @allocations(ds.attrib) <= 300
+        @test @allocated(ds.attrib) <= 30000
     else
-        @test @allocations(ds.attrib) <= 500
+        @test @allocated(ds.attrib) <= 65000
     end
 end
 

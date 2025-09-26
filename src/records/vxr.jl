@@ -1,9 +1,9 @@
 """
 Variable Index Record (VXR) - contains pointers to variable data records
 """
-struct VXR
+struct VXR{FieldSizeT}
     # header::Header
-    vxr_next::Int64        # Next VXR in chain
+    vxr_next::FieldSizeT       # Next VXR in chain
     n_entries::Int32       # Number of entries
     n_used_entries::Int32  # Number of used entries
     pointer::Ptr{Int32}
@@ -27,12 +27,12 @@ function VXR(source::Vector{UInt8}, offset, FieldSizeT)
     return VXR(vxr_next, n_entries, n_used_entries, p)
 end
 
-function Base.iterate(vxr::VXR, state = 1)
+function Base.iterate(vxr::VXR{FieldSizeT}, state = 1) where {FieldSizeT}
     state > vxr.n_used_entries && return nothing
     pointer = vxr.pointer
     first = read_be(pointer, state)
     last = read_be(pointer, state + vxr.n_entries)
-    offset_pointer = convert(Ptr{Int64}, pointer + (2 * vxr.n_entries) * sizeof(Int32))
+    offset_pointer = convert(Ptr{FieldSizeT}, pointer + (2 * vxr.n_entries) * sizeof(Int32))
     offset = read_be(offset_pointer, state)
     return ((first, last, Int(offset)), state + 1)
 end

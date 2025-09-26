@@ -21,6 +21,7 @@ CommonDataFormatCommonDataModelExt = ["CommonDataModel"]
 
 [compat]
 CodecZlib = "0.7"
+CommonDataModel = "0.4"
 Dates = "1"
 Dictionaries = "0.4"
 DiskArrays = "0.4"

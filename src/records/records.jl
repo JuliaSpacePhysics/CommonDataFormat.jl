@@ -1,8 +1,6 @@
 # CDF Record structures and definitions
 # Based on the C++ CDFpp implementation structure
 # [CDF Internal Format Description](https://spdf.gsfc.nasa.gov/pub/software/cdf/doc/cdfifd.pdf)
-abstract type Record end
-
 Base.iterate(r::Record, i = 1) = i > fieldcount(typeof(r)) ? nothing : (getfield(r, i), i + 1)
 
 """
@@ -27,10 +25,17 @@ end
 
 get_record_type(buffer, offset, FieldSizeT) = read_be(buffer, offset + sizeof(FieldSizeT) + 1, Int32)
 
-@inline function check_record_type(record_type, buffer, offset, FieldSizeT)
+@inline function check_record_type(record_type::Integer, buffer, offset, FieldSizeT)
     pos = offset + sizeof(FieldSizeT) + 1
     header_type = read_be(buffer, pos, Int32)
     @assert header_type == record_type
+    return pos + sizeof(Int32)
+end
+
+@inline function check_record_type(record_types, buffer, offset, FieldSizeT)
+    pos = offset + sizeof(FieldSizeT) + 1
+    header_type = read_be(buffer, pos, Int32)
+    @assert header_type in record_types
     return pos + sizeof(Int32)
 end
 
@@ -83,7 +88,7 @@ function Base.show(io::IO, cdr::CDR)
     println(io, "CDR (CDF Descriptor Record):")
     # println(io, "  Record Size: $(cdr.header.record_size) bytes")
     # println(io, "  Record Type: $(cdr.header.record_type)")
-    println(io, "  GDR Offset: 0x$(string(cdr.gdr_offset, base = 16, pad = 8))")
+    println(io, "  GDR Offset: $(string(cdr.gdr_offset, base = 16, pad = 8))")
     println(io, "  Version: $(cdr.version).$(cdr.release).$(cdr.increment)")
     println(io, "  Encoding: $(cdr.encoding)")
     println(io, "  Flags: 0x$(string(cdr.flags, base = 16, pad = 8))")

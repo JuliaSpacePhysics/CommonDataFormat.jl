@@ -2,7 +2,7 @@ struct CCR <: Record
     header::Header
     cpr_offset::UInt64
     uncompressed_size::UInt64 # uSize Size of the CDF in its uncompressed form. This byte count does NOT include the 8-byte magic numbers, and 16-byte checksum if it exists.
-    rfu_a::UInt32
+    rfu_a::RInt32
     data_offset::Int
     data_length::Int
 end
@@ -14,11 +14,11 @@ end
     pos += sizeof(RecordSizeType) + 4
     cpr_offset, pos = read_be_i(buffer, pos, RecordSizeType)
     uncompressed_size, pos = read_be_i(buffer, pos, RecordSizeType)
-    rfu_a, data_offset = read_be_i(buffer, pos, UInt32)
+    rfu_a, data_offset = read_be_i(buffer, pos, RInt32)
     record_end = offset + header.record_size
     data_length = record_end - data_offset
     @assert data_length >= 0 "Invalid CCR data length"
-    return CCR(header, UInt64(cpr_offset), UInt64(uncompressed_size), UInt32(rfu_a), data_offset, data_length)
+    return CCR(header, UInt64(cpr_offset), UInt64(uncompressed_size), rfu_a, data_offset, data_length)
 end
 
 @inline function data_view(ccr::CCR, buffer::Vector{UInt8})

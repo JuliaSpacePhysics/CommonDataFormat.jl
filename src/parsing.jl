@@ -4,7 +4,6 @@
 @inline read_be(io::IO, T) = ntoh(read(io, T))
 @inline read_be(io::IO, n, T) = ntuple(i -> read_be(io, T), n)
 
-
 # Buffer-based reading functions for zero-copy access
 # https://github.com/JuliaLang/julia/issues/31305
 @inline function read_be(v::Vector{UInt8}, i, T)
@@ -13,6 +12,8 @@
         ntoh(unsafe_load(p))
     end
 end
+
+@inline read_be(v::Vector{UInt8}, i, ::Type{RInt32}) = RInt32()
 
 @inline function read_be(p::Ptr{T}, i) where {T}
     return ntoh(unsafe_load(p + (i - 1) * sizeof(T)))
@@ -67,6 +68,29 @@ macro read_be_fields(buffer, pos, Ts...)
     push!(stmts, :(($tuple_expr, $pos_sym)))
 
     return Expr(:block, stmts...)
+end
+
+# Optimized version using loop unrolling for better performance
+@generated function read_be_fields(buffer::Vector{UInt8}, pos::Integer, ::Type{SType}, ::Val{indxs}) where {SType, indxs}
+    exprs = Expr[]
+    value_syms = [gensym(:field) for _ in 1:length(indxs)]
+    pos_sym = gensym(:pos)
+
+    # Initialize position
+    push!(exprs, :(local $pos_sym = pos))
+
+    # Read each field
+    for (i, idx) in enumerate(indxs)
+        T = fieldtype(SType, idx)
+        push!(exprs, :(local $(value_syms[i]) = read_be(buffer, $pos_sym, $T)))
+        push!(exprs, :($pos_sym += sizeof($T)))
+    end
+
+    # Return tuple of values and final position
+    tuple_expr = Expr(:tuple, value_syms...)
+    push!(exprs, :(($tuple_expr, $pos_sym)))
+
+    return Expr(:block, exprs...)
 end
 
 function flatten_field_types(mod, args)

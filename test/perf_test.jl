@@ -30,10 +30,10 @@ b = [b0, b1, b2, b30, b3, b4, b5]
 # ┌ Info: Benchmarks
 # │   b =
 # │    7-element Vector{Chairmarks.Sample}:
-# │     1.029 μs (26 allocs: 1.250 KiB)
-# │     2.633 μs (42 allocs: 29.812 KiB)
-# │     103.959 μs (4398 allocs: 184.547 KiB)
-# │     2.785 μs (19 allocs: 27.109 KiB)
-# │     10.674 ms (589 allocs: 31.693 MiB)
-# │     468.342 μs (115 allocs: 1.382 MiB)
-# └     290.209 μs (309 allocs: 47.938 KiB)
+# │     1.010 μs (26 allocs: 1.172 KiB)
+# │     2.617 μs (42 allocs: 29.734 KiB)
+# │     104.104 μs (4395 allocs: 181.781 KiB)
+# │     2.746 μs (18 allocs: 27.000 KiB)
+# │     9.829 ms (588 allocs: 31.692 MiB)
+# │     469.183 μs (114 allocs: 1.382 MiB)
+# └     290.812 μs (304 allocs: 47.203 KiB)

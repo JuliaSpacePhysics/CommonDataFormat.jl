@@ -1,7 +1,7 @@
-struct CDFDataset{CT, RS}
+struct CDFDataset{CT, FST}
     filename::String
-    cdr::CDR
-    gdr::GDR
+    cdr::CDR{FST}
+    gdr::GDR{FST}
     buffer::Vector{UInt8}
 end
 
@@ -26,16 +26,16 @@ function CDFDataset(filename)
         magic_bytes = read_be(buffer, 1, UInt32)
         @assert validate_cdf_magic(magic_bytes)
 
-        RecordSizeType = is_cdf_v3(magic_bytes) ? Int64 : Int32
+        FieldSizeType = is_cdf_v3(magic_bytes) ? Int64 : Int32
         compression_flag = read_be(buffer, 5, UInt32)
         compression = NoCompression
         if compression_flag != 0x0000FFFF
-            buffer, compression = decompress_bytes(buffer, RecordSizeType)
+            buffer, compression = decompress_bytes(buffer, FieldSizeType)
         end
         # Parse CDF header
-        cdr = CDR(buffer, 8, RecordSizeType)
-        gdr = GDR(buffer, cdr.gdr_offset, RecordSizeType)
-        return CDFDataset{compression, RecordSizeType}(filename, cdr, gdr, buffer)
+        cdr = CDR(buffer, 8, FieldSizeType)
+        gdr = GDR(buffer, Int(cdr.gdr_offset), FieldSizeType)
+        return CDFDataset{compression, FieldSizeType}(filename, cdr, gdr, buffer)
     end
 end
 
