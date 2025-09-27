@@ -125,6 +125,12 @@ function readname(buf::Vector{UInt8}, offset::Int)
     return @views buf[offset:(offset + 255)]
 end
 
+@resumable function get_offsets_lazy(buffer::Vector{UInt8}, pos::Int64, ::Type{RecordSizeType}) where {RecordSizeType}
+    while pos != 0
+        @yield pos
+        pos = read_be(buffer, pos + 1 + sizeof(RecordSizeType) + 4, RecordSizeType)
+    end
+end
 
 function get_offsets!(offsets, buffer::Vector{UInt8}, pos::Int64, RecordSizeType)
     while pos != 0
