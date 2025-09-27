@@ -109,15 +109,17 @@ function vattrib(cdf, varnum, name)
     return nothing
 end
 
-function _search_aedr_entries(source, aedr_head::Int64, RecordSizeType, cdf_encoding::Int32, target_varnum::Integer)
+function _search_aedr_entries(source, aedr_head, RecordSizeType, cdf_encoding::Int32, target_varnum::Integer)
     aedr_head == 0 && return nothing
-    offset = aedr_head
+    offset = Int(aedr_head)
+    _num_offset = 13 + 2 * sizeof(RecordSizeType)
+    _next_offset = 5 + sizeof(RecordSizeType)
     while offset != 0
-        num = read_be(source, offset + 29, Int32)
+        num = read_be(source, offset + _num_offset, Int32)
         if num == target_varnum
             return load_aedr_data(source, offset, RecordSizeType, cdf_encoding)
         end
-        offset = read_be(source, offset + 13, Int64)
+        offset = Int(read_be(source, offset + _next_offset, RecordSizeType))
     end
     return nothing
 end
