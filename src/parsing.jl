@@ -125,21 +125,23 @@ function readname(buf::Vector{UInt8}, offset::Int)
     return @views buf[offset:(offset + 255)]
 end
 
-@resumable function get_offsets_lazy(buffer::Vector{UInt8}, pos::Int64, ::Type{RecordSizeType}) where {RecordSizeType}
+@resumable function get_offsets_lazy(buffer::Vector{UInt8}, pos, ::Type{RecordSizeType}) where {RecordSizeType}
+    pos = Int(pos)
     while pos != 0
         @yield pos
-        pos = read_be(buffer, pos + 1 + sizeof(RecordSizeType) + 4, RecordSizeType)
+        pos = Int(read_be(buffer, pos + 1 + sizeof(RecordSizeType) + 4, RecordSizeType))
     end
 end
 
-function get_offsets!(offsets, buffer::Vector{UInt8}, pos::Int64, RecordSizeType)
+function get_offsets!(offsets, buffer::Vector{UInt8}, pos, FieldSizeType)
+    pos = Int(pos)
     while pos != 0
         push!(offsets, pos)
-        pos = read_be(buffer, pos + 1 + sizeof(RecordSizeType) + 4, Int64)
+        pos = Int(read_be(buffer, pos + 1 + sizeof(FieldSizeType) + 4, FieldSizeType))
     end
     return offsets
 end
-get_offsets(args...) = get_offsets!(Int64[], args...)
+get_offsets(args...) = get_offsets!(Int[], args...)
 
 
 # Big-endian readers (CDF uses big-endian for most fields)
