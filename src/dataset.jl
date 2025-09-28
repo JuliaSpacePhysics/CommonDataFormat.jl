@@ -27,9 +27,8 @@ function CDFDataset(filename)
         @assert validate_cdf_magic(magic_bytes)
 
         FieldSizeType = is_cdf_v3(magic_bytes) ? Int64 : Int32
-        compression_flag = read_be(buffer, 5, UInt32)
         compression = NoCompression
-        if compression_flag != 0x0000FFFF
+        if is_compressed(read_be(buffer, 5, UInt32))
             buffer, compression = decompress_bytes(buffer, FieldSizeType)
         end
         # Parse CDF header
@@ -38,6 +37,8 @@ function CDFDataset(filename)
         return CDFDataset{compression, FieldSizeType}(filename, cdr, gdr, buffer)
     end
 end
+
+is_compressed(magic_numbers::UInt32) = magic_numbers != 0x0000FFFF
 
 # Convenience accessors for the dataset with lazy loading
 function Base.getproperty(cdf::CDFDataset{CT}, name::Symbol) where {CT}

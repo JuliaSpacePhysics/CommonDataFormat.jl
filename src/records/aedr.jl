@@ -21,7 +21,7 @@ struct AEDR{FST, A}
     Value::A            # This consists of the number of elements (specified by the NumElems field) of the data type (specified by the DataType field). This can be thought of as a 1-dimensional array of values (stored contiguously). The size of this field is the product of the number of elements and the size in bytes of each element.
 end
 
-@inline function load_aedr_data(buffer::Vector{UInt8}, offset, RecordSizeType, cdf_encoding)
+function load_aedr_data(buffer::Vector{UInt8}, offset, RecordSizeType, cdf_encoding)
     _datatype_offset = 9 + 2 * sizeof(RecordSizeType)
     _numelems_offset = 17 + 2 * sizeof(RecordSizeType)
     _data_offset = 41 + 2 * sizeof(RecordSizeType)

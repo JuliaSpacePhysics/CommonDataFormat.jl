@@ -156,10 +156,9 @@ function collect_vxr_entries!(entries::Vector{VVREntry}, src, offset, ::Type{Fie
 end
 
 function variable_compression(buffer::Vector{UInt8}, vdr, RecordSizeType)
-    has_compression = (vdr.flags & 0x04) != 0
-    offset_value = vdr.cpr_or_spr_offset
-    if has_compression && offset_value != 0
-        cpr = CPR(buffer, Int(offset_value), RecordSizeType)
+    offset_value = Int(vdr.cpr_or_spr_offset)
+    if is_compressed(vdr) && offset_value != 0
+        cpr = CPR(buffer, offset_value, RecordSizeType)
         return CompressionType(cpr.compression_type)
     end
     return NoCompression
