@@ -57,6 +57,7 @@ fillvalue(::TT2000) = 9999
 
 (-)(epoch::Epoch, other::Epoch) = Millisecond(round(Int64, epoch.instant - other.instant))
 (+)(tt2000::TT2000, other::Period) = TT2000(tt2000.instant.value + Dates.tons(other))
+(+)(epoch::Epoch, other::Period) = Epoch(epoch.instant + Dates.toms(other))
 
 # Conversion to DateTime
 function Dates.DateTime(epoch::Epoch)
@@ -76,12 +77,7 @@ function Dates.DateTime(epoch::TT2000)
     return DateTime(1970) + Nanosecond(ns_from_1970 - leap_seconds_ns)
 end
 
-# Conversion from DateTime
-function Epoch(dt::DateTime)
-    ms_since_unix = (dt - DateTime(1970, 1, 1)).value
-    return Epoch(ms_since_unix + EPOCH_OFFSET_MILLISECONDS)
-end
-
+# Conversion from TimeType
 function Epoch16(dt::DateTime)
     ns_since_unix = (dt - DateTime(1970, 1, 1)).value * 1_000_000  # DateTime precision is milliseconds
     s_since_unix = ns_since_unix / 1.0e9
@@ -90,13 +86,17 @@ function Epoch16(dt::DateTime)
     return Epoch16(s_total, ps_component)
 end
 
-function Base.convert(::Type{TT2000}, dt::DateTime)
-    ns_since_unix = (dt - DateTime(1970, 1, 1)).value * 1_000_000
+function Base.convert(::Type{TT2000}, dt::TimeType)
+    ns_since_unix = (DateTime(dt) - DateTime(1970, 1, 1)).value * 1_000_000
     leap_seconds_ns = leap_second(ns_since_unix)
     tt2000_value = ns_since_unix - TT2000_OFFSET + leap_seconds_ns
     return TT2000(tt2000_value)
 end
 
+function Base.convert(::Type{Epoch}, dt::TimeType)
+    ms_since_unix = (DateTime(dt) - DateTime(1970, 1, 1)).value
+    return Epoch(ms_since_unix + EPOCH_OFFSET_MILLISECONDS)
+end
 
 for f in (:year, :month, :day, :hour, :minute, :second, :millisecond)
     @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(DateTime(epoch))

@@ -50,6 +50,9 @@ end
     @test ds["var"][1:5] == reference["var"][1:5]
     @test ds["var2d"][1, :] == reference["var2d"][1, :]
     @test ds["var_string"] == reference["var_string"]
+
+    var = ds["var"]
+    @test occursin("compressed", string(var.vdr))
 end
 
 @testset "CHECK_VARIABLES - Variable structure verification" begin

@@ -109,7 +109,7 @@ function vattrib(cdf, varnum, name)
     return nothing
 end
 
-function _search_aedr_entries(source, aedr_head, RecordSizeType, cdf_encoding::Int32, target_varnum::Integer)
+@inline function _search_aedr_entries(source, aedr_head, RecordSizeType, cdf_encoding::Int32, target_varnum)
     aedr_head == 0 && return nothing
     offset = Int(aedr_head)
     _num_offset = 13 + 2 * sizeof(RecordSizeType)
