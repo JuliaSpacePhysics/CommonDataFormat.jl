@@ -13,7 +13,6 @@ struct CDFVariable{T, N, V, P} <: AbstractVariable{T, N}
     vdr::V
     parentdataset::P
     dims::NTuple{N, Int}
-    record_size::Int
     vvrs::Vector{VVREntry}
     compression::CompressionType
     byte_swap::Bool

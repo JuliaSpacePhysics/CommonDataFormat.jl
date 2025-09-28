@@ -11,3 +11,11 @@ include("utils.jl")
     @test "CATDESC" in keys(var.attrib)
     @test CommonDataFormat.attrib(var, "FILLVAL")[1] == -1.0f31
 end
+
+@testset "local test" begin
+    file = joinpath(pkgdir(CommonDataFormat), "data", ".wi_h2_mfi_20210119_v05.cdf")
+    if isfile(file)
+        ds = CDFDataset(file)
+        @test ndims(ds["BGSM"]) == 2
+    end
+end

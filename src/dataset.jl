@@ -65,13 +65,13 @@ function find_vdr(cdf::CDFDataset, var_name::String)
     RecordSizeType = recordsize_type(cdf)
     buffer = cdf.buffer
     var_name_bytes = codeunits(var_name)
+    vdr_name_offset = 45 + 5 * sizeof(RecordSizeType)
     for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
         while current_offset != 0
-            vdr = zVDR(buffer, current_offset, RecordSizeType)
-            if vdr.name == var_name_bytes
-                return vdr
+            if readname(buffer, current_offset + vdr_name_offset) == var_name_bytes
+                return VDR(buffer, current_offset, RecordSizeType)
             end
-            current_offset = vdr.vdr_next
+            current_offset = read_be(buffer, current_offset + 5 + sizeof(RecordSizeType), RecordSizeType)
         end
     end
     return nothing
@@ -90,12 +90,13 @@ function Base.keys(cdf::CDFDataset)
     source = parent(cdf)
     varnames = Vector{String}(undef, gdr.NrVars + gdr.NzVars)
     i = 1
+    vdr_name_offset = 45 + 5 * sizeof(RecordSizeType)
     for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
         while current_offset != 0
-            vdr = VDR(source, current_offset, RecordSizeType)
-            varnames[i] = String(vdr.name)
+            vdr_next = read_be(source, current_offset + 5 + sizeof(RecordSizeType), RecordSizeType)
+            varnames[i] = String(readname(source, current_offset + vdr_name_offset))
             i += 1
-            current_offset = vdr.vdr_next
+            current_offset = vdr_next
         end
     end
     return varnames
