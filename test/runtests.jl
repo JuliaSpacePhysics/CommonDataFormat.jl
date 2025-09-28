@@ -8,6 +8,11 @@ include("comprehensive_test.jl")
 include("cdf2_test.jl")
 include("CommonDataModelExt_test.jl")
 
+@testset "Aqua" begin
+    using Aqua
+    Aqua.test_all(CommonDataFormat)
+end
+
 @testset "Fill Value" begin
     for T in (Int8, Int16, Int32, Int64, Float32, Float64, UInt8, UInt16, UInt32)
         @test CDF.fillvalue(T) isa T

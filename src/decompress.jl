@@ -2,7 +2,7 @@ include("decompress/rle.jl")
 include("decompress/gzip.jl")
 
 
-function decompress_bytes(buffer::Vector{UInt8}, RecordSizeType)
+function decompress_bytes(buffer, RecordSizeType)
     ccr = CCR(buffer, 8, RecordSizeType)
     cpr = CPR(buffer, Int(ccr.cpr_offset), RecordSizeType)
     compression = CompressionType(cpr.compression_type)
@@ -20,7 +20,7 @@ function decompress_bytes(buffer::Vector{UInt8}, RecordSizeType)
     return new_buffer, compression
 end
 
-function decompress_bytes(data::AbstractVector{UInt8}, compression::CompressionType; expected_bytes::Union{Nothing, Int} = nothing)
+function decompress_bytes(data, compression::CompressionType; expected_bytes::Union{Nothing, Int} = nothing)
     compression == NoCompression && return data
     @assert compression in (GzipCompression, RLECompression)
     if compression == GzipCompression

@@ -1,11 +1,11 @@
 module CommonDataFormat
 
-using Dates, UnixTimes
+using Dates
 using Mmap
-using Dictionaries
+using Dictionaries: Dictionary
 using ResumableFunctions
 using DiskArrays
-using StaticStrings
+using StaticStrings: StaticString
 using Base.Threads
 using CodecZlib: GzipDecompressor, transcode
 using LibDeflate
