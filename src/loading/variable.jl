@@ -20,30 +20,22 @@ end
 
 
 function variable(cdf::CDFDataset, name)
-    source = parent(cdf)
-    FieldSizeT = recordsize_type(cdf)
     vdr = find_vdr(cdf, name)
     isnothing(vdr) && throw(KeyError(name))
     T = julia_type(vdr.data_type, vdr.num_elems)
-    record_dims = vdr.z_dim_sizes
-    dims = Int.((record_dims..., vdr.max_rec + 1))
-    N = length(dims)
-    record_size = prod(record_dims)
-    vvrs, vvr_type = read_vvrs(source, vdr, FieldSizeT)
+    record_dims = record_sizes(vdr)
+    dims = (record_dims..., vdr.max_rec + 1)
+    N = vdr.z_num_dims + 1
+    vvrs, vvr_type = read_vvrs(vdr)
     compression = if !isempty(vvrs) #  # vvr records is the ultimative source
-        vvr_type == VVR_ ? NoCompression : variable_compression(source, vdr, FieldSizeT)
+        vvr_type == VVR_ ? NoCompression : variable_compression(vdr)
     else
         NoCompression
     end
     byte_swap = is_big_endian_encoding(cdf.cdr.encoding)
 
     return CDFVariable{T, N, typeof(vdr), typeof(cdf)}(
-        name,
-        vdr, cdf,
-        dims, record_size,
-        vvrs,
-        compression,
-        byte_swap,
+        name, vdr, cdf, dims, vvrs, compression, byte_swap
     )
 end
 
@@ -67,7 +59,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
     last_rec = last(record_range)
     start_idx = findfirst(entry -> entry.first <= first_rec <= entry.last, entries)
     end_idx = findfirst(entry -> entry.first <= last_rec <= entry.last, entries)
-    record_size = var.record_size
+    record_size = prod(dims_without_record)
 
     # If the variable is not compressed and the other dimension ranges are the same as the variable range
     # we can directly read the data into dest
@@ -89,51 +81,39 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
     else
         Base.@inbounds Threads.@threads for i in eachindex(start_idx:end_idx)
             entry = entries[i]
-            decompressor = take!(decompressors())
             if is_full_record && entry.first >= first_rec && entry.last <= last_rec
                 # full entry
                 dest_range = dst_src_ranges(first_rec, last_rec, entry)[1]
                 dest_view = selectdim(dest, N, dest_range)
                 total_elems = record_size * length(entry)
+                decompressor = take!(decompressors())
                 load_cvvr_data!(dest_view, 1, buffer, entry.offset, total_elems, RecordSizeType, var.compression; decompressor)
+                put!(decompressors(), decompressor)
             else
                 # partial entry
                 (dest_range, local_range) = dst_src_ranges(first_rec, last_rec, entry)
                 dest_view = selectdim(dest, N, dest_range)
                 n_records = length(entry)
                 total_elems = record_size * n_records
-                chunk_data = _load_entry_chunk(var, entry, RecordSizeType, buffer; decompressor)
-                chunk_array = reshape(chunk_data, dims_without_record..., :)
+                chunk = Vector{T}(undef, total_elems)
+
+                if is_no_compression
+                    load_vvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType)
+                else
+                    decompressor = take!(decompressors())
+                    load_cvvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType, var.compression; decompressor)
+                    put!(decompressors(), decompressor)
+                end
+
+                # chunk_data = _load_entry_chunk(var, entry, RecordSizeType, buffer, var.compression; decompressor)
+                chunk_array = reshape(chunk, dims_without_record..., :)
                 src_view = view(chunk_array, other_ranges..., local_range)
                 dest_view .= src_view
             end
-            put!(decompressors(), decompressor)
         end
     end
     var.byte_swap && _btye_swap!(dest)
     return dest
-end
-
-function _load_entry_chunk(var::CDFVariable{T}, entry::VVREntry, RecordSizeType, buffer; decompressor) where {T}
-    n_records = entry.last - entry.first + 1
-    total_elems = n_records * var.record_size
-    chunk = Vector{T}(undef, total_elems)
-    total_elems == 0 && return chunk
-    if var.compression == NoCompression
-        load_vvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType)
-    else
-        load_cvvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType, var.compression; decompressor)
-    end
-    return chunk
-end
-
-function read_vvrs(src, vdr, ::Type{FieldSizeT}) where {FieldSizeT}
-    vxr_head = vdr.vxr_head
-    entries = Vector{VVREntry}()
-    sizehint!(entries, 1)
-    vvr_type = collect_vxr_entries!(entries, src, Int(vxr_head), FieldSizeT)
-    vvr_type = @something vvr_type VVR_
-    return entries, vvr_type
 end
 
 function collect_vxr_entries!(entries::Vector{VVREntry}, src, offset, ::Type{FieldSizeT}) where {FieldSizeT}
@@ -155,10 +135,11 @@ function collect_vxr_entries!(entries::Vector{VVREntry}, src, offset, ::Type{Fie
     return vvr_type
 end
 
-function variable_compression(buffer::Vector{UInt8}, vdr, RecordSizeType)
+function variable_compression(vdr::VDR{FieldSizeT}) where {FieldSizeT}
     offset_value = Int(vdr.cpr_or_spr_offset)
     if is_compressed(vdr) && offset_value != 0
-        cpr = CPR(buffer, offset_value, RecordSizeType)
+        buffer = vdr.buffer
+        cpr = CPR(buffer, offset_value, FieldSizeT)
         return CompressionType(cpr.compression_type)
     end
     return NoCompression
