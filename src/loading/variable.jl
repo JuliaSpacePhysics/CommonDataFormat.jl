@@ -26,16 +26,10 @@ function variable(cdf::CDFDataset, name)
     record_dims = record_sizes(vdr)
     dims = (record_dims..., vdr.max_rec + 1)
     N = vdr.z_num_dims + 1
-    vvrs, vvr_type = read_vvrs(vdr)
-    compression = if !isempty(vvrs) #  # vvr records is the ultimative source
-        vvr_type == VVR_ ? NoCompression : variable_compression(vdr)
-    else
-        NoCompression
-    end
     byte_swap = is_big_endian_encoding(cdf.cdr.encoding)
 
     return CDFVariable{T, N, typeof(vdr), typeof(cdf)}(
-        name, vdr, cdf, dims, vvrs, compression, byte_swap
+        name, vdr, cdf, dims, byte_swap
     )
 end
 
@@ -45,15 +39,20 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
 
     buffer = parent(var.parentdataset)
     RecordSizeType = recordsize_type(var.parentdataset)
-    entries = var.vvrs
+    entries, vvr_type = read_vvrs(var.vdr)
     isempty(entries) && return dest
+    compression = if !isempty(entries) #  # vvr records is the ultimative source
+        vvr_type == VVR_ ? NoCompression : variable_compression(var.vdr)
+    else
+        NoCompression
+    end
 
     record_range = ranges[end]
     other_ranges = ranges[1:(N - 1)]
     dims_without_record = var.dims[1:(N - 1)]
 
     is_full_record = length.(other_ranges) == dims_without_record
-    is_no_compression = var.compression == NoCompression
+    is_no_compression = compression == NoCompression
 
     first_rec = first(record_range)
     last_rec = last(record_range)
@@ -87,7 +86,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
                 dest_view = selectdim(dest, N, dest_range)
                 total_elems = record_size * length(entry)
                 decompressor = take!(decompressors())
-                load_cvvr_data!(dest_view, 1, buffer, entry.offset, total_elems, RecordSizeType, var.compression; decompressor)
+                load_cvvr_data!(dest_view, 1, buffer, entry.offset, total_elems, RecordSizeType, compression; decompressor)
                 put!(decompressors(), decompressor)
             else
                 # partial entry
@@ -101,7 +100,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
                     load_vvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType)
                 else
                     decompressor = take!(decompressors())
-                    load_cvvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType, var.compression; decompressor)
+                    load_cvvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType, compression; decompressor)
                     put!(decompressors(), decompressor)
                 end
 

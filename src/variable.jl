@@ -13,8 +13,6 @@ struct CDFVariable{T, N, V, P} <: AbstractVariable{T, N}
     vdr::V
     parentdataset::P
     dims::NTuple{N, Int}
-    vvrs::Vector{VVREntry}
-    compression::CompressionType
     byte_swap::Bool
 end
 
@@ -30,22 +28,38 @@ function dst_src_ranges(first, last, entry)
     return (dest_first:dest_last, local_first:local_last)
 end
 
-DiskArrays.haschunks(::CDFVariable) = DiskArrays.Chunked()
-function DiskArrays.eachchunk(var::CDFVariable)
+# Codes seem to be faster if we disable chunking
+DiskArrays.haschunks(::CDFVariable) = DiskArrays.Unchunked()
+# DiskArrays.haschunks(::CDFVariable) = DiskArrays.Chunked()
+DiskArrays.eachchunk(var::CDFVariable) = _eachchunk(var)
+
+function _eachchunk(var::CDFVariable)
+    N = ndims(var)
+    chunks = ntuple(N) do i
+        arraysize = var.dims[i]
+        chunksize = max(arraysize, 1) # handle zero-size dimensions
+        DiskArrays.RegularChunks(chunksize, 0, arraysize)
+    end
+    return DiskArrays.GridChunks(chunks)
+end
+
+function _eachchunk_vvrs(var::CDFVariable)
+    vvrs, _ = read_vvrs(var.vdr)
     N = ndims(var)
     chunks = ntuple(N) do i
         if i != N
             DiskArrays.RegularChunks(var.dims[i], 0, var.dims[i])
         else
-            chunksizes = length.(var.vvrs)
-            if length(var.vvrs) > 0
-                chunksizes[end] = @views var.dims[N] - sum(chunksizes[1:end-1])
+            chunksizes = length.(vvrs)
+            if length(vvrs) > 0
+                chunksizes[end] = @views var.dims[N] - sum(chunksizes[1:(end - 1)])
             end
             DiskArrays.IrregularChunks(chunksizes = chunksizes)
         end
     end
     return DiskArrays.GridChunks(chunks)
 end
+
 
 function Base.getproperty(var::CDFVariable, name::Symbol)
     name in fieldnames(CDFVariable) && return getfield(var, name)
