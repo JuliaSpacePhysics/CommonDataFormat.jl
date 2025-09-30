@@ -25,7 +25,7 @@ end
 end
 
 @inline function read_be_i(v::Vector{UInt8}, i, T::Base.DataType)
-    return read_be(v, i, T), i + sizeof(T)
+    return read_be(v, i, T), i + _sizeof(T)
 end
 
 @inline function read_be_i(v::Vector{UInt8}, i, n::Integer, T)
@@ -61,7 +61,7 @@ macro read_be_fields(buffer, pos, Ts...)
     for (sym, T) in zip(value_syms, types)
         Tesc = esc(T)
         push!(stmts, :(local $sym = read_be($buf, $pos_sym, $Tesc)))
-        push!(stmts, :($pos_sym += sizeof($Tesc)))
+        push!(stmts, :($pos_sym += _sizeof($Tesc)))
     end
 
     tuple_expr = Expr(:tuple, value_syms...)
@@ -83,7 +83,7 @@ end
     for (i, idx) in enumerate(indxs)
         T = fieldtype(SType, idx)
         push!(exprs, :(local $(value_syms[i]) = read_be(buffer, $pos_sym, $T)))
-        push!(exprs, :($pos_sym += sizeof($T)))
+        push!(exprs, :($pos_sym += _sizeof($T)))
     end
 
     # Return tuple of values and final position
