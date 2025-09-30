@@ -57,6 +57,8 @@ end
     @test ds["var_string"] == reference["var_string"]
 
     var = ds["var"]
+    #TODO: find a better and small dataset to really test the chunking
+    @test CommonDataFormat._eachchunk_vvrs(ds["var3d"]) == CommonDataFormat._eachchunk(ds["var3d"])
     @test occursin("compressed", string(var.vdr))
 end
 
