@@ -17,7 +17,8 @@ struct GDR{FS}
     # rfu_c::Int32        # Reserved field C
     # leap_second_last_updated::Int32
     # rfu_e::Int32        # Reserved field E
-    # r_dim_sizes::Tuple{Vararg{Int32}}  # Dimension sizes for r-variables
+    pos::Int
+    # r_dim_sizes::Vector{Int32}  # Dimension sizes for r-variables
 end
 
 
@@ -29,7 +30,12 @@ Load a Global Descriptor Record from the buffer at the specified offset.
 @inline function GDR(buffer::Vector{UInt8}, offset, FieldSizeT)
     pos = check_record_type(2, buffer, offset, FieldSizeT)
     fields, pos = read_be_fields(buffer, pos, GDR{FieldSizeT}, Val(1:9))
-    # r_num_dims = fields[8]
-    # r_dim_sizes = read_be(buffer, pos, r_num_dims, Int32)
-    return GDR(fields...)
+    return GDR(fields..., pos)
+end
+
+function r_dim_sizes(gdr::GDR, buffer::Vector{UInt8})
+    pos = gdr.pos + sizeof(Int64) + sizeof(Int32) + sizeof(Int32) + sizeof(Int32)
+    r_num_dims = gdr.r_num_dims
+    @assert r_num_dims > 0
+    return read_be(buffer, pos, r_num_dims, Int32)
 end

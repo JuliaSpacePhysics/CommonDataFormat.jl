@@ -23,9 +23,8 @@ function variable(cdf::CDFDataset, name)
     vdr = find_vdr(cdf, name)
     isnothing(vdr) && throw(KeyError(name))
     T = julia_type(vdr.data_type, vdr.num_elems)
-    record_dims = record_sizes(vdr)
-    dims = (record_dims..., vdr.max_rec + 1)
-    N = vdr.z_num_dims + 1
+    dims = (record_sizes(vdr)..., vdr.max_rec + 1)
+    N = vdr isa VDR ? vdr.num_dims + 1 : length(dims)
     byte_swap = is_big_endian_encoding(cdf.cdr.encoding)
 
     return CDFVariable{T, N, typeof(vdr), typeof(cdf)}(
@@ -134,7 +133,7 @@ function collect_vxr_entries!(entries::Vector{VVREntry}, src, offset, ::Type{Fie
     return vvr_type
 end
 
-function variable_compression(vdr::VDR{FieldSizeT}) where {FieldSizeT}
+function variable_compression(vdr::AbstractVDR{FieldSizeT}) where {FieldSizeT}
     offset_value = Int(vdr.cpr_or_spr_offset)
     if is_compressed(vdr) && offset_value != 0
         buffer = vdr.buffer
