@@ -1,5 +1,5 @@
 perf:
-    #!/usr/bin/env -S julia --threads=auto --project=. -i
+    #!/usr/bin/env -S julia --threads=auto --project=.
     @time using CommonDataFormat
     elx_file = "data/elb_l2_epdef_20210914_v01.cdf"
     @time ds = CDFDataset(elx_file)

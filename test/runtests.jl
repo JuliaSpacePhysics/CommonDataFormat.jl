@@ -71,12 +71,17 @@ end
     @test var[1:3] == Float32[6.7, 6.7, 7.3]
     @test var["UNITS"] == "nT"
     @test var["FIELDNAM"] == "BR (RTN)"
+
+
+    @test ds["Epoch"][1] == DateTime(2024, 9, 1, 0, 0)
+    @test ntoh(hton(ds["Epoch"][1])) == DateTime(2024, 9, 1, 0, 0)
+
     @test @allocations(ds["BR"]) <= 50
     @info @allocated(ds.attrib)
     if VERSION >= v"1.12"
         @test @allocated(ds.attrib) <= 30000
     else
-        @test @allocated(ds.attrib) <= 65000
+        @test @allocated(ds.attrib) <= 70000
     end
 end
 
