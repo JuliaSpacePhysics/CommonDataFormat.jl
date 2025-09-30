@@ -7,6 +7,7 @@ using Dates
     @test DateTime(Epoch(DateTime(0))) == DateTime(0)
     @test Epoch(Epoch(0)) == Epoch(0)
     @test Epoch(10) - Epoch(0) == Millisecond(10)
+    @test string(Epoch(-1.0e31)) == "FILLVAL"
     # @test Epoch16(DateTime(0)) == Epoch16(0, 0)
 end
 
@@ -17,4 +18,8 @@ end
     @test TT2000(10) - TT2000(0) == Nanosecond(10)
     @test floor(TT2000(0), Minute(1)) == DateTime(2000, 1, 1, 11, 58)
     @test TT2000(0) + Minute(1) == TT2000(60_000_000_000)
+
+    @test string(TT2000(0)) == "2000-01-01T11:58:55.816"
+    @test TT2000(0) == TT2000(0) |> bswap
+    @test TT2000(0) == DateTime("2000-01-01T11:58:55.816")
 end

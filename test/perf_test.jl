@@ -13,8 +13,8 @@ var = ds["elb_pef_hs_Epat_eflux"]
 sum(var)
 full_load(elx_file)
 b0 = @b ds["elb_pef_hs_Epat_eflux"] evals=20
-b1= @b sum(Array(ds["elb_pef_hs_Epat_eflux"])) evals=5
-b12= @b sum(ds["elb_pef_hs_Epat_eflux"]) evals=5
+b1= @b sum(Array(var)) evals=5
+b12= @b sum(var) evals=5
 b2= @b full_load(elx_file)  evals=2
 
 mms_file = data_path(".mms1_scm_srvy_l2_scsrvy_20190301_v2.2.0.cdf")

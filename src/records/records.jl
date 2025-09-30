@@ -40,11 +40,11 @@ end
 end
 
 include("cdr.jl")
+include("gdr.jl")
 include("vdr.jl")
 include("vxr.jl")
 include("adr.jl")
 include("aedr.jl")
-include("gdr.jl")
 include("vvr.jl")
 include("cpr.jl")
 include("ccr.jl")

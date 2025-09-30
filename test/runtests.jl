@@ -80,15 +80,16 @@ end
     end
 end
 
-@testset "CHECK_VARIABLES - CDF_CHAR" begin
+@testset "CDF_CHAR" begin
     file = data_path("ge_h0_cpi_00000000_v01.cdf")
     ds = CDFDataset(file)
     @test ds["label_v3c"] == ["Ion Vx GSE    " ; "Ion Vy GSE    " ; "Ion Vz GSE    ";;]
 end
 
-@testset "Epochs" begin
-    @test string(Epoch(-1.0e31)) == "FILLVAL"
-    @test string(TT2000(0)) == "2000-01-01T11:58:55.816"
-    @test TT2000(0) == TT2000(0) |> bswap
-    @test TT2000(0) == DateTime("2000-01-01T11:58:55.816")
+@testset "r-variables" begin
+    file = data_path("ac_h0_mfi_20230102_v07.cdf")
+    ds = CDFDataset(file)
+    var = ds["BGSEc"]
+    @test var.vdr isa CommonDataFormat.rVDR
+    @test size(var) == (3, 5400)
 end

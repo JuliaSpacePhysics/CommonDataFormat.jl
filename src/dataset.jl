@@ -69,7 +69,13 @@ function find_vdr(cdf::CDFDataset, var_name::String)
     for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
         while current_offset != 0
             if readname(buffer, current_offset + vdr_name_offset) == var_name_bytes
-                return VDR(buffer, current_offset, RecordSizeType)
+                record_type = read_be(buffer, current_offset + 1 + sizeof(RecordSizeType), Int32)
+                @assert record_type in (8, 3)
+                if record_type == 8
+                    return VDR(buffer, current_offset, RecordSizeType)
+                else
+                    return rVDR(buffer, current_offset, gdr, RecordSizeType)
+                end
             end
             current_offset = read_be(buffer, current_offset + 5 + sizeof(RecordSizeType), RecordSizeType)
         end
