@@ -10,6 +10,7 @@ using Base.Threads
 using CodecZlib: GzipDecompressor, transcode
 using LibDeflate
 using LibDeflate: GzipDecompressResult
+using PrecompileTools
 
 export CDFDataset, CDFVariable
 export Majority, CompressionType, DataType
@@ -29,5 +30,6 @@ include("vattribute.jl")
 include("dataset.jl")
 include("loading/attribute.jl")
 include("loading/variable.jl")
+include("precompile.jl")
 
 end

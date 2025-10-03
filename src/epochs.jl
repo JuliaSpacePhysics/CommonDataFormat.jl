@@ -6,6 +6,7 @@
 # 3. CDF_TIME_TT2000 (TT2000 as short) is nanoseconds since J2000 with leap seconds
 
 import Base: promote_rule, -, +
+using Dates: value, toms, tons
 
 include("leap_second.jl")
 
@@ -13,6 +14,20 @@ const EPOCH_OFFSET_MILLISECONDS = 62167219200000.0  # Milliseconds from year 0 t
 const EPOCH_OFFSET_SECONDS = 62167219200.0  # Seconds from year 0 to Unix epoch
 
 abstract type CDFDateTime <: Dates.AbstractDateTime end
+
+struct Picosecond <: Period
+    value::Float64
+end
+
+Picosecond(ns::Nanosecond) = convert(Picosecond, ns)
+Picosecond(p::Period) = Picosecond(Nanosecond(p))
+Base.convert(::Type{Nanosecond}, x::Picosecond) = Nanosecond(round(Int64, x.value / 1.0e3))
+Base.convert(::Type{Picosecond}, x::Nanosecond) = Picosecond(x.value * 1.0e3)
+Base.convert(::Type{Picosecond}, x::Dates.FixedPeriod) = Picosecond(Nanosecond(x))
+Base.promote_rule(::Type{Picosecond}, ::Type{<:Dates.FixedPeriod}) = Picosecond
+
+Dates._units(x::Picosecond) = " picosecond" * (abs(value(x)) == 1 ? "" : "s")
+
 
 """
     Epoch
@@ -56,8 +71,11 @@ fillvalue(::Epoch16) = -1.0e31
 fillvalue(::TT2000) = 9999
 
 (-)(epoch::Epoch, other::Epoch) = Millisecond(round(Int64, epoch.instant - other.instant))
-(+)(tt2000::TT2000, other::Period) = TT2000(tt2000.instant.value + Dates.tons(other))
-(+)(epoch::Epoch, other::Period) = Epoch(epoch.instant + Dates.toms(other))
+(-)(epoch::Epoch16, other::Epoch16) = Picosecond((epoch.seconds - other.seconds) * 1.0e12 + epoch.picoseconds - other.picoseconds)
+(+)(tt2000::TT2000, other::Period) = TT2000(value(tt2000) + tons(other))
+(-)(tt2000::TT2000, other::Period) = TT2000(value(tt2000) - tons(other))
+(+)(epoch::Epoch, other::Period) = Epoch(value(epoch) + toms(other))
+(-)(epoch::Epoch, other::Period) = Epoch(value(epoch) - toms(other))
 
 # Conversion to DateTime
 function Dates.DateTime(epoch::Epoch)
@@ -66,8 +84,8 @@ end
 
 function Dates.DateTime(epoch::Epoch16)
     s_since_unix = epoch.seconds - EPOCH_OFFSET_SECONDS
-    total_ns = s_since_unix * 1.0e9 + epoch.picoseconds / 1000.0
-    return DateTime(1970) + Nanosecond(round(Int64, total_ns))
+    total_ms = s_since_unix * 1.0e3 + epoch.picoseconds / 1.0e9
+    return DateTime(1970) + Millisecond(round(Int64, total_ms))
 end
 
 function Dates.DateTime(epoch::TT2000)
@@ -79,10 +97,10 @@ end
 
 # Conversion from TimeType
 function Epoch16(dt::DateTime)
-    ns_since_unix = (dt - DateTime(1970, 1, 1)).value * 1_000_000  # DateTime precision is milliseconds
-    s_since_unix = ns_since_unix / 1.0e9
+    ms_since_unix = value(dt - DateTime(1970, 1, 1))
+    s_since_unix = div(ms_since_unix, 1000)
     s_total = s_since_unix + EPOCH_OFFSET_SECONDS
-    ps_component = (ns_since_unix % 1.0e9) * 1000.0  # Convert nanoseconds remainder to picoseconds
+    ps_component = rem(ms_since_unix, 1000) * 1000000000  # Convert nanoseconds remainder to picoseconds
     return Epoch16(s_total, ps_component)
 end
 
@@ -102,11 +120,12 @@ for f in (:year, :month, :day, :hour, :minute, :second, :millisecond)
     @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(DateTime(epoch))
 end
 
-Dates.value(epoch::CDFDateTime) = epoch.instant
+Dates.value(epoch::Epoch) = epoch.instant
+Dates.value(epoch::Epoch16) = ComplexF64(epoch.seconds, epoch.picoseconds)
 Dates.value(epoch::TT2000) = epoch.instant.value
 
 function Base.floor(x::T, p::Union{DatePeriod, TimePeriod}) where {T <: CDFDateTime}
-    convert(T, floor(convert(DateTime, x), p))
+    return convert(T, floor(convert(DateTime, x), p))
 end
 
 function Base.show(io::IO, epoch::CDFDateTime)
@@ -117,7 +136,12 @@ function Base.show(io::IO, epoch::CDFDateTime)
         print(io, DateTime(epoch))
     end
 end
+function Base.show(io::IO, epoch::Epoch16)
+    return print(io, DateTime(epoch))
+end
+
 Base.promote_rule(::Type{<:CDFDateTime}, ::Type{Dates.DateTime}) = Dates.DateTime
 Base.convert(::Type{Dates.DateTime}, x::CDFDateTime) = Dates.DateTime(x)
-Base.bswap(x::T) where {T <: CDFDateTime} = T(Base.bswap(x.instant))
+Base.bswap(x::Epoch) = Epoch(Base.bswap(x.instant))
+Base.bswap(x::Epoch16) = Epoch16(Base.bswap(x.seconds), Base.bswap(x.picoseconds))
 Base.bswap(x::TT2000) = TT2000(Base.bswap(x.instant.value))

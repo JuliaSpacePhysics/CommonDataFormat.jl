@@ -19,8 +19,9 @@ b2= @b full_load(elx_file)  evals=2
 
 mms_file = data_path(".mms1_scm_srvy_l2_scsrvy_20190301_v2.2.0.cdf")
 ds = CDFDataset(mms_file)
-sum(ds["mms1_scm_acb_gse_scsrvy_srvy_l2"])
-sum(ds["mms1_scm_acb_gse_scsrvy_srvy_l2"][:, 100:100000]) 
+var = ds["mms1_scm_acb_gse_scsrvy_srvy_l2"]
+sum(var)
+sum(var[:, 100:100000]) 
 b30 = @b ds["mms1_scm_acb_gse_scsrvy_srvy_l2"] evals=20
 b3= @b sum(Array(ds["mms1_scm_acb_gse_scsrvy_srvy_l2"])) evals=2
 b4= @b sum(ds["mms1_scm_acb_gse_scsrvy_srvy_l2"][:, 100:100000]) evals=5
