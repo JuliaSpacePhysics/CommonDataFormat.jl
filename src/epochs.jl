@@ -116,6 +116,10 @@ function Base.convert(::Type{Epoch}, dt::TimeType)
     return Epoch(ms_since_unix + EPOCH_OFFSET_MILLISECONDS)
 end
 
+for t in (:Epoch, :Epoch16, :TT2000)
+    @eval Base.convert(::Type{$t}, dt::$t) = dt
+end
+
 for f in (:year, :month, :day, :hour, :minute, :second, :millisecond)
     @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(DateTime(epoch))
 end
