@@ -124,6 +124,10 @@ for f in (:year, :month, :day, :hour, :minute, :second, :millisecond)
     @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(DateTime(epoch))
 end
 
+Epoch(s::AbstractString) = Epoch(DateTime(s))
+Epoch16(s::AbstractString) = Epoch16(DateTime(s))
+TT2000(s::AbstractString) = TT2000(DateTime(s))
+
 Dates.value(epoch::Epoch) = epoch.instant
 Dates.value(epoch::Epoch16) = ComplexF64(epoch.seconds, epoch.picoseconds)
 Dates.value(epoch::TT2000) = epoch.instant.value

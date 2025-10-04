@@ -64,12 +64,14 @@ function vattrib(cdf::CDFDataset, varnum::Integer)
     for offset in offsets
         is_global(buffer, offset, RecordSizeType) && continue
         adr = ADR(buffer, offset, RecordSizeType)
-        @assert min(adr.AgrEDRhead, adr.AzEDRhead) == 0
-        head = max(adr.AgrEDRhead, adr.AzEDRhead)
-        found = _search_aedr_entries(buffer, head, RecordSizeType, cdf_encoding, varnum)
-        isnothing(found) && continue
-        name = String(adr.Name)
-        attributes[name] = _get_attributes(name, found, cdf)
+        for head in (adr.AgrEDRhead, adr.AzEDRhead)
+            head == 0 && continue
+            found = _search_aedr_entries(buffer, head, RecordSizeType, cdf_encoding, varnum)
+            isnothing(found) && continue
+            name = String(adr.Name)
+            attributes[name] = _get_attributes(name, found, cdf)
+            break
+        end
     end
     return attributes
 end
@@ -101,10 +103,13 @@ function vattrib(cdf, varnum, name)
         is_global(buffer, offset, RecordSizeType) && continue
         adr = ADR(buffer, offset, RecordSizeType)
         adr.Name != name_bytes && continue
-        @assert min(adr.AgrEDRhead, adr.AzEDRhead) == 0
-        head = max(adr.AgrEDRhead, adr.AzEDRhead)
-        value = _search_aedr_entries(buffer, head, RecordSizeType, cdf_encoding, varnum)
-        return _get_attributes(name, value, cdf)
+        for head in (adr.AgrEDRhead, adr.AzEDRhead)
+            head == 0 && continue
+            found = _search_aedr_entries(buffer, head, RecordSizeType, cdf_encoding, varnum)
+            isnothing(found) && continue
+            return _get_attributes(name, found, cdf)
+        end
+        return nothing
     end
     return nothing
 end
