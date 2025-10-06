@@ -64,13 +64,13 @@ const EXPECTED_VARIABLES = Dict(
     "var3d_counter" => (
         shape = (3, 5, 10),  # Shape adjusted for Julia column-major
         data_type = "CDF_DOUBLE",
-        values = reshape(0.0:(3 * 5 * 10 - 1), 3, 5, 10),
+        values = permutedims(reshape(0.0:(3 * 5 * 10 - 1), 5, 3, 10), (2, 1, 3)),
         attributes = Dict("attr1" => "attr1_value", "attr2" => "attr2_value"),
     ),
     "var5d_counter" => (
         shape = (5, 4, 3, 2, 6),  # Shape adjusted for Julia column-major
         data_type = "CDF_DOUBLE",
-        values = reshape(0.0:(5 * 4 * 3 * 2 * 6 - 1), 5, 4, 3, 2, 6),
+        values = permutedims(reshape(0.0:(5 * 4 * 3 * 2 * 6 - 1), 2, 3, 4, 5, 6), (4, 3, 2, 1, 5)),
         attributes = Dict{String, Any}(),
     ),
     "var3d" => (
@@ -113,12 +113,12 @@ const EXPECTED_VARIABLES = Dict(
         shape = (2, 2, 1),
         data_type = "CDF_CHAR",
         attributes = Dict{String, Any}(),
-        values = ["value[00]"; "value[01]";; "value[10]"; "value[11]";;;],
+        values = ["value[00]"; "value[10]";; "value[01]"; "value[11]";;;],
     ),
     "var4d_string" => (
         shape = (3, 2, 2, 1),
         data_type = "CDF_CHAR",
-        values = ["value[000]" "value[011]"; "value[001]" "value[100]"; "value[010]" "value[101]";;; "value[110]" "value[201]"; "value[111]" "value[210]"; "value[200]" "value[211]";;;;],
+        values = ["value[000]"; "value[100]"; "value[200]" ;; "value[010]"; "value[110]"; "value[210]";;; "value[001]"; "value[101]"; "value[201]";; "value[011]"; "value[111]"; "value[211]";;;;],
         attributes = Dict{String, Any}(),
     )
 )
@@ -160,6 +160,14 @@ end
             @test var.attrib == expected.attributes
         end
     end
+end
+
+@testset "Variable Slicing" begin
+    @test ds["var3d_counter"][1, 1, :] == 0:15:135
+    @test ds["var3d_counter"][:, :, 2]' == reshape(15:29, 5, 3)
+
+    @test ds["var3d_counter"][2, :, 2] == 20:24
+    @test ds["var3d_counter"][:, 1, 2] == 15:5:25
 end
 
 @testset "Variable Varying" begin

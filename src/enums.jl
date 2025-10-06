@@ -1,6 +1,6 @@
-@enum Majority begin
-    Row = 0
-    Column = 1
+@enum Majority::Bool begin
+    Row = false
+    Column = true
 end
 
 @enum RecordType::Int8 begin

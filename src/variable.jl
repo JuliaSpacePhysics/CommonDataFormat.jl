@@ -18,6 +18,8 @@ end
 
 Base.size(var::CDFVariable) = var.dims
 
+@inline majority(var::CDFVariable) = majority(var.parentdataset)
+
 function dst_src_ranges(first, last, entry)
     overlap_first = max(first, entry.first)
     overlap_last = min(last, entry.last)
