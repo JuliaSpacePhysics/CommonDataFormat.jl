@@ -28,6 +28,7 @@ end
     @test ds.compression == CDF.NoCompression
     @test first(ds) == ds["var"]
     @test occursin("Version: 3.9.0", string(ds))
+    display(ds)
 end
 
 @testset "Compressed cdf file (gzip)" begin

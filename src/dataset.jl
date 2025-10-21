@@ -113,12 +113,18 @@ Base.haskey(cdf::CDFDataset, var_name::String) = var_name in keys(cdf)
 
 Base.iterate(cdf::CDFDataset, state = 1) = state > length(cdf) ? nothing : (cdf[keys(cdf)[state]], state + 1)
 
-function Base.show(io::IO, ::MIME"text/plain", cdf::CDFDataset)
-    println(io, typeof(cdf), ":", cdf.filename)
-    println(io, "variables")
-    for var in keys(cdf)
-        println(io, "  $var")
+function Base.show(io::IO, m::MIME"text/plain", cdf::CDFDataset)
+    println(io, typeof(cdf))
+    println(io, "path: ", cdf.filename)
+    println(io, "variables:")
+    for key in keys(cdf)
+        var = cdf[key]
+        print(io, "  $key : ", size(var), " ", DataType(var.vdr.data_type))
+        !isempty(var) && print(io, " [", var[1], " … ", var[end], "]")
+        println(io)
     end
     println(io, cdf.cdr)
+    print(io, "attributes: ")
+    show(io, m, cdf.attrib)
     return
 end
