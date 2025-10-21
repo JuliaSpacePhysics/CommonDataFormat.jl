@@ -18,6 +18,24 @@ else
     end
 end
 
+"""
+    majority_swap!(data, dims_without_record)
+
+Convert row-major data layout to column-major (Julia's native layout) in-place.
+For row-major CDF files, this reverses the dimension order (except record dimension).
+"""
+function majority_swap!(data::AbstractArray{T, N}, dims_without_record) where {T, N}
+    N <= 2 && return data
+    perm = ntuple(i -> N - i, N - 1)
+    reversed_dims = reverse(dims_without_record)
+    temp = similar(data, dims_without_record)
+    for slc in eachslice(data; dims = N)
+        permutedims!(temp, reshape(slc, reversed_dims), perm)
+        copyto!(slc, temp)
+    end
+    return data
+end
+
 
 function variable(cdf::CDFDataset, name)
     vdr = find_vdr(cdf, name)
@@ -59,6 +77,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
     end_idx = findfirst(entry -> entry.first <= last_rec <= entry.last, entries)
     record_size = prod(dims_without_record)
 
+    is_row_major = majority(var) == Row
     # If the variable is not compressed and the other dimension ranges are the same as the variable range
     # we can directly read the data into dest
     if is_no_compression && is_full_record
@@ -76,8 +95,9 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
             doffs += N_elems
         end
         @assert doffs == length(dest) + 1
+        is_row_major && majority_swap!(dest, dims_without_record)
     else
-        Base.@inbounds Threads.@threads for i in eachindex(start_idx:end_idx)
+        Base.@inbounds Threads.@threads for i in start_idx:end_idx
             entry = entries[i]
             if is_full_record && entry.first >= first_rec && entry.last <= last_rec
                 # full entry
@@ -86,6 +106,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
                 total_elems = record_size * length(entry)
                 decompressor = take!(decompressors())
                 load_cvvr_data!(dest_view, 1, buffer, entry.offset, total_elems, RecordSizeType, compression; decompressor)
+                is_row_major && majority_swap!(dest_view, dims_without_record)
                 put!(decompressors(), decompressor)
             else
                 # partial entry
@@ -105,6 +126,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
 
                 # chunk_data = _load_entry_chunk(var, entry, RecordSizeType, buffer, var.compression; decompressor)
                 chunk_array = reshape(chunk, dims_without_record..., :)
+                is_row_major && majority_swap!(chunk_array, dims_without_record)
                 src_view = view(chunk_array, other_ranges..., local_range)
                 dest_view .= src_view
             end

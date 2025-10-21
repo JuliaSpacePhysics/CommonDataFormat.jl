@@ -39,14 +39,15 @@ function CDFDataset(filename)
 end
 
 is_compressed(magic_numbers::UInt32) = magic_numbers != 0x0000FFFF
+majority(cdf::CDFDataset) = majority(cdf.cdr)
 
 # Convenience accessors for the dataset with lazy loading
-function Base.getproperty(cdf::CDFDataset{CT}, name::Symbol) where {CT}
+@inline function Base.getproperty(cdf::CDFDataset{CT, FST}, name::Symbol) where {CT, FST}
     name in fieldnames(CDFDataset) && return getfield(cdf, name)
     if name === :version
         return version(cdf.cdr)
     elseif name === :majority
-        return Majority(cdf.cdr)
+        return majority(cdf)
     elseif name === :compression
         return CT
     elseif name === :adr

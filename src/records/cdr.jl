@@ -18,7 +18,7 @@ struct CDR{FST} <: Record
 end
 
 version(cdr::CDR; verbose = true) = verbose ? (cdr.version, cdr.release, cdr.increment) : cdr.version
-Majority(cdr::CDR) = (cdr.flags & 0x01) != 0 ? Majority(0) : Majority(1)  # Row=0, Column=1
+majority(cdr::CDR) = (cdr.flags & 0x01) != 0 ? Row : Column  # Row=0, Column=1
 is_cdf_v3(cdr::CDR) = cdr.version == 3
 
 """

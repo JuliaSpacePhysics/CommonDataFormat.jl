@@ -74,7 +74,6 @@ Decode the CDR flags field into individual boolean flags.
 function decode_cdr_flags(flags)
     flags = UInt32(flags)
     return (
-        row_majority = (flags & 0x01) != 0,
         single_file_format = (flags & 0x02) != 0,
         checksum_used = (flags & 0x04) != 0,
         md5_checksum = (flags & 0x08) != 0,
@@ -92,7 +91,7 @@ function Base.show(io::IO, cdr::CDR)
     println(io, "  Version: $(cdr.version).$(cdr.release).$(cdr.increment)")
     println(io, "  Encoding: $(cdr.encoding)")
     println(io, "  Flags: 0x$(string(cdr.flags, base = 16, pad = 8))")
-    println(io, "    - Row Majority: $(flag_info.row_majority)")
+    println(io, "    - Majority: $(majority(cdr))")
     println(io, "    - Single File Format: $(flag_info.single_file_format)")
     println(io, "    - Checksum Used: $(flag_info.checksum_used)")
     println(io, "    - MD5 Checksum: $(flag_info.md5_checksum)")
