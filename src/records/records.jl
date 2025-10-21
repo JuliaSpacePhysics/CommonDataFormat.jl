@@ -85,9 +85,6 @@ function Base.show(io::IO, cdr::CDR)
     flag_info = decode_cdr_flags(cdr.flags)
 
     println(io, "CDR (CDF Descriptor Record):")
-    # println(io, "  Record Size: $(cdr.header.record_size) bytes")
-    # println(io, "  Record Type: $(cdr.header.record_type)")
-    println(io, "  GDR Offset: $(string(cdr.gdr_offset, base = 16, pad = 8))")
     println(io, "  Version: $(cdr.version).$(cdr.release).$(cdr.increment)")
     println(io, "  Encoding: $(cdr.encoding)")
     println(io, "  Flags: 0x$(string(cdr.flags, base = 16, pad = 8))")
@@ -95,5 +92,6 @@ function Base.show(io::IO, cdr::CDR)
     println(io, "    - Single File Format: $(flag_info.single_file_format)")
     println(io, "    - Checksum Used: $(flag_info.checksum_used)")
     println(io, "    - MD5 Checksum: $(flag_info.md5_checksum)")
-    return println(io, "  Identifier: $(cdr.identifier)")
+    println(io, "  Identifier: $(cdr.identifier)")
+    return
 end
