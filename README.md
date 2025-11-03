@@ -40,6 +40,8 @@ var = cdf["temperature"]
 - [CDFpp](https://github.com/SciQLop/CDFpp): A modern C++ header only cdf library with Python bindings
 - [cdflib](https://github.com/MAVENSDC/cdflib): A python module for reading and writing NASA's Common Data Format (cdf) files
 
+See [CDF reader benchmarks](https://juliaspacephysics.github.io/tutorials/cdf) for comparison with other CDF readers.
+
 ## Reference
 
 - [CDF Internal Format Description](https://spdf.gsfc.nasa.gov/pub/software/cdf/doc/cdfifd.pdf)
