@@ -4,6 +4,8 @@ CurrentModule = CommonDataFormat
 
 # CommonDataFormat.jl
 
+[![DOI](https://zenodo.org/badge/1057373325.svg)](https://doi.org/10.5281/zenodo.17517061)
+
 A Julia package for reading [Common Data Format (CDF)](https://cdf.gsfc.nasa.gov/) files, widely used in space physics for storing multidimensional data arrays and metadata. See [CDFDatasets.jl](https://github.com/JuliaSpacePhysics/CDFDatasets.jl) for a high-level interface.
 
 ## Installation
