@@ -1,9 +1,6 @@
 # CDF parsing utilities
 # Low-level binary reading and record parsing functions
 
-@inline read_be(io::IO, T) = ntoh(read(io, T))
-@inline read_be(io::IO, n, T) = ntuple(i -> read_be(io, T), n)
-
 # Buffer-based reading functions for zero-copy access
 # https://github.com/JuliaLang/julia/issues/31305
 @inline function read_be(v::Vector{UInt8}, i, T)
@@ -13,7 +10,7 @@
     end
 end
 
-@inline read_be(v::Vector{UInt8}, i, ::Type{RInt32}) = RInt32()
+@inline read_be(::Vector{UInt8}, i, ::Type{RInt32}) = RInt32()
 
 @inline function read_be(p::Ptr{T}, i) where {T}
     return ntoh(unsafe_load(p + (i - 1) * sizeof(T)))
@@ -142,16 +139,6 @@ function get_offsets!(offsets, buffer::Vector{UInt8}, pos, FieldSizeType)
     return offsets
 end
 get_offsets(args...) = get_offsets!(Int[], args...)
-
-
-# Big-endian readers (CDF uses big-endian for most fields)
-"""
-    read_uint32_be(io::IO)
-
-Read a 32-bit unsigned integer in big-endian byte order.
-CDF format uses big-endian for record fields.
-"""
-read_uint32_be(io::IO) = ntoh(read(io, UInt32))
 
 """
     is_cdf_v3(magic_bytes)

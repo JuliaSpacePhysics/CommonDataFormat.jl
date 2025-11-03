@@ -43,10 +43,8 @@ function variable(cdf::CDFDataset, name)
     T = julia_type(vdr.data_type, vdr.num_elems)
     dims = (record_sizes(vdr)..., vdr.max_rec + 1)
     N = vdr isa VDR ? vdr.num_dims + 1 : length(dims)
-    byte_swap = is_big_endian_encoding(cdf.cdr.encoding)
-
     return CDFVariable{T, N, typeof(vdr), typeof(cdf)}(
-        name, vdr, cdf, dims, byte_swap
+        name, vdr, cdf, dims
     )
 end
 
@@ -132,7 +130,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
             end
         end
     end
-    var.byte_swap && _btye_swap!(dest)
+    is_big_endian_encoding(var) && _btye_swap!(dest)
     return dest
 end
 

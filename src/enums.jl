@@ -40,9 +40,6 @@ end
     CDF_UCHAR = 52
 end
 
-DataType(x::DataType) = x
-DataType(x::UInt32) = DataType(Int32(x))
-
 Base.:(==)(x::RecordType, y::T) where {T <: Integer} = T(x) == y
 Base.:(==)(x::T, y::RecordType) where {T <: Integer} = x == T(y)
 Base.:(==)(x::DataType, y::T) where {T <: Integer} = T(x) == y

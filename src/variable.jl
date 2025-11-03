@@ -13,12 +13,12 @@ struct CDFVariable{T, N, V, P} <: AbstractVariable{T, N}
     vdr::V
     parentdataset::P
     dims::NTuple{N, Int}
-    byte_swap::Bool
 end
 
 Base.size(var::CDFVariable) = var.dims
 
 @inline majority(var::CDFVariable) = majority(var.parentdataset)
+@inline is_big_endian_encoding(var::CDFVariable) = is_big_endian_encoding(var.parentdataset)
 
 function dst_src_ranges(first, last, entry)
     overlap_first = max(first, entry.first)
@@ -87,10 +87,14 @@ end
 attrib(var::CDFVariable, name::String) = vattrib(var.parentdataset, var.vdr.num, name)
 attrib(var::CDFVariable) = vattrib(var.parentdataset, var.vdr.num)
 
-function CPR(var::CDFVariable)
-    vdr = var.vdr
-    cdf = var.parentdataset
-    return CPR(parent(cdf), vdr.cpr_or_spr_offset, recordsize_type(cdf))
-end
-
 is_record_varying(v::CDFVariable) = is_record_varying(v.vdr)
+variable_type(v::CDFVariable) = get(v.attrib, "VAR_TYPE", "unknown")
+
+function Base.show(io::IO, m::MIME"text/plain", var::CDFVariable)
+    summary(io, var)
+    println(io)
+    println(io, var.vdr)
+    print(io, "attributes: ")
+    show(io, m, var.attrib)
+    return
+end

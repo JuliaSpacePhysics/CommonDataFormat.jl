@@ -29,6 +29,7 @@ end
     @test first(ds) == ds["var"]
     @test occursin("Version: 3.9.0", string(ds))
     display(ds)
+    display(ds["var"])
 end
 
 @testset "Compressed cdf file (gzip)" begin

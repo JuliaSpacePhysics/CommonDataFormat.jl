@@ -38,6 +38,8 @@ function CDFDataset(filename)
     end
 end
 
+is_big_endian_encoding(cdf::CDFDataset) = is_big_endian_encoding(cdf.cdr.encoding)
+
 is_compressed(magic_numbers::UInt32) = magic_numbers != 0x0000FFFF
 majority(cdf::CDFDataset) = majority(cdf.cdr)
 
@@ -119,7 +121,9 @@ function Base.show(io::IO, m::MIME"text/plain", cdf::CDFDataset)
     println(io, "variables:")
     for key in keys(cdf)
         var = cdf[key]
-        print(io, "  $key : ", size(var), " ", DataType(var.vdr.data_type))
+        print(io, "  ", key, " : ", size(var), " ")
+        printstyled(io, variable_type(var); bold = true)
+        print(io, " ", DataType(var.vdr.data_type))
         !isempty(var) && print(io, " [", var[1], " … ", var[end], "]")
         println(io)
     end
