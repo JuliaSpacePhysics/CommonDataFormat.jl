@@ -13,6 +13,11 @@ include("CommonDataModelExt_test.jl")
     Aqua.test_all(CommonDataFormat)
 end
 
+@testset "JET" begin
+    using JET
+    JET.test_package(CommonDataFormat; target_modules = [CommonDataFormat])
+end
+
 @testset "Fill Value" begin
     for T in (Int8, Int16, Int32, Int64, Float32, Float64, UInt8, UInt16, UInt32)
         @test CDF.fillvalue(T) isa T

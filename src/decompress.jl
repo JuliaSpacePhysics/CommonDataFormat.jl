@@ -23,11 +23,11 @@ end
 function decompress_bytes(data, compression::CompressionType; expected_bytes::Union{Nothing, Int} = nothing)
     compression == NoCompression && return data
     @assert compression in (GzipCompression, RLECompression)
-    if compression == GzipCompression
-        result = transcode(GzipDecompressor, Vector{UInt8}(data))
-    elseif compression == RLECompression
+    result = if compression == GzipCompression
+        transcode(GzipDecompressor, Vector{UInt8}(data))
+    else
         isnothing(expected_bytes) && throw(ArgumentError("RLE decompression requires expected size"))
-        result = _rle_decompress(data, expected_bytes)
+        _rle_decompress(data, expected_bytes)
     end
     if !isnothing(expected_bytes) && length(result) != expected_bytes
         throw(ArgumentError("Decompressed payload size mismatch (expected $(expected_bytes), got $(length(result)))"))

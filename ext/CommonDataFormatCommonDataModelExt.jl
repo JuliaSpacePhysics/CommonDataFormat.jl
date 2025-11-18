@@ -5,6 +5,8 @@ import CommonDataFormat as CDF
 import CommonDataModel
 import CommonDataModel as CDM
 using CommonDataFormat: CDFDataset, CDFVariable
+import CommonDataModel: path, varnames, variable, attribnames, attrib
+import CommonDataModel: name, dataset, dimnames
 
 const SymbolOrString = Union{Symbol, AbstractString}
 
