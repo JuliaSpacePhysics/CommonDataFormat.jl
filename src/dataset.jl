@@ -21,7 +21,8 @@ cdf = CDFDataset("data.cdf")
 ```
 """
 function CDFDataset(filename)
-    return open(filename, "r") do io
+    fname = String(filename)
+    return open(fname, "r") do io
         buffer = Mmap.mmap(io)
         magic_bytes = read_be(buffer, 1, UInt32)
         @assert validate_cdf_magic(magic_bytes)
@@ -34,7 +35,7 @@ function CDFDataset(filename)
         # Parse CDF header
         cdr = CDR(buffer, 8, FieldSizeType)
         gdr = GDR(buffer, Int(cdr.gdr_offset), FieldSizeType)
-        return CDFDataset{compression, FieldSizeType}(filename, cdr, gdr, buffer)
+        return CDFDataset{compression, FieldSizeType}(fname, cdr, gdr, buffer)
     end
 end
 

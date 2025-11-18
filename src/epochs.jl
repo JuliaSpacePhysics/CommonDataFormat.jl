@@ -138,7 +138,7 @@ end
 
 function Base.show(io::IO, epoch::CDFDateTime)
     fillval = fillvalue(epoch)
-    return if fillval == epoch.instant
+    return if fillval == Dates.value(epoch)
         print(io, "FILLVAL")
     else
         print(io, DateTime(epoch))

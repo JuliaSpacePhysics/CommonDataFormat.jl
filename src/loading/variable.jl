@@ -71,8 +71,8 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
 
     first_rec = first(record_range)
     last_rec = last(record_range)
-    start_idx = findfirst(entry -> entry.first <= first_rec <= entry.last, entries)
-    end_idx = findfirst(entry -> entry.first <= last_rec <= entry.last, entries)
+    start_idx = findfirst(entry -> entry.first <= first_rec <= entry.last, entries)::Int
+    end_idx = findfirst(entry -> entry.first <= last_rec <= entry.last, entries)::Int
     record_size = prod(dims_without_record)
 
     is_row_major = majority(var) == Row

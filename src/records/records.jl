@@ -11,12 +11,6 @@ struct Header
     record_type::Int32
 end
 
-@inline function Header(io::IO, FieldSizeT)
-    record_size = Int64(read_be(io, FieldSizeT))
-    record_type = read_be(io, Int32)
-    return Header(record_size, record_type)
-end
-
 @inline function Header(buf::Vector{UInt8}, pos, FieldSizeT)
     record_size = Int64(read_be(buf, pos, FieldSizeT))
     record_type = read_be(buf, pos + sizeof(FieldSizeT), Int32)
@@ -49,15 +43,6 @@ include("vvr.jl")
 include("cpr.jl")
 include("ccr.jl")
 include("cvvr.jl")
-
-for R in (:ADR, :AEDR, :GDR, :VDR)
-    @eval begin
-        @inline function $R(io::IO, offset, RecordSizeType)
-            seek(io, offset)
-            return $R(io, RecordSizeType)
-        end
-    end
-end
 
 # Utility functions to decode CDR flags
 """
