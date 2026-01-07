@@ -81,7 +81,7 @@ end
 @inline function record_sizes(vdr::rVDR)
     gdr = vdr.gdr
     buffer = vdr.buffer
-    dim_varys = collect(read_be(buffer, vdr.pos, gdr.r_num_dims, Int32))::Vector{Int32}
+    dim_varys = collect(read_be(buffer, vdr.pos, gdr.r_num_dims, Int32))
     return r_dim_sizes(gdr, buffer)[dim_varys .!= 0]
 end
 

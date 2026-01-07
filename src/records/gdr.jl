@@ -36,6 +36,6 @@ end
 function r_dim_sizes(gdr::GDR, buffer::Vector{UInt8})
     pos = gdr.pos + sizeof(Int64) + sizeof(Int32) + sizeof(Int32) + sizeof(Int32)
     r_num_dims = gdr.r_num_dims
-    @assert r_num_dims > 0
+    @assert r_num_dims >= 0
     return read_be(buffer, pos, r_num_dims, Int32)
 end
