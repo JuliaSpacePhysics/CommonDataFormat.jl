@@ -24,7 +24,13 @@ function decompress_bytes(data, compression::CompressionType; expected_bytes::Un
     compression == NoCompression && return data
     @assert compression in (GzipCompression, RLECompression)
     result = if compression == GzipCompression
-        transcode(GzipDecompressor, Vector{UInt8}(data))
+        decompressor = Decompressor()
+        input = convert(Vector{UInt8}, data)
+        max_size = isnothing(expected_bytes) ? length(input) * 10 : expected_bytes
+        output = Vector{UInt8}(undef, max_size)
+        decomp_result = gzip_decompress!(decompressor, output, input)
+        resize!(output, decomp_result.len)
+        output
     else
         isnothing(expected_bytes) && throw(ArgumentError("RLE decompression requires expected size"))
         _rle_decompress(data, expected_bytes)

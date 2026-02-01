@@ -2,11 +2,9 @@ module CommonDataFormat
 
 using Dates
 using Mmap
-using Dictionaries: Dictionary
 using ResumableFunctions
 using DiskArrays
 using Base.Threads
-using CodecZlib: GzipDecompressor, transcode
 using LibDeflate
 using LibDeflate: GzipDecompressResult
 using PrecompileTools

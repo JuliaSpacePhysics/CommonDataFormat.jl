@@ -31,7 +31,7 @@ function attrib(cdf::CDFDataset; predicate = is_global)
     aedrs = map(adrs) do adr
         load_attribute_entries(buffer, adr, RecordSizeType, cdf_encoding)
     end
-    return Dictionary(names, aedrs)
+    return Dict(zip(names, aedrs))
 end
 
 """
