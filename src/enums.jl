@@ -67,5 +67,5 @@ const type_map = Dict(
 
 function julia_type(cdf_type, num_elems)
     cdf_type = DataType(cdf_type)
-    return cdf_type in (CDF_CHAR, CDF_UCHAR) ? StaticString{Int(num_elems)} : type_map[cdf_type]
+    return cdf_type in (CDF_CHAR, CDF_UCHAR) ? StaticString{Int(num_elems), UInt8} : type_map[cdf_type]
 end

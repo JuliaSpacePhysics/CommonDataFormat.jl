@@ -164,7 +164,7 @@ function validate_cdf_magic(magic_bytes)
 end
 
 _btye_swap!(data) = map!(ntoh, data, data)
-_btye_swap!(data::AbstractArray{StaticString{N}}) where {N} = data
+_btye_swap!(data::AbstractArray{<:StaticString{N}}) where {N} = data
 # function _btye_swap!(data::AbstractArray{TT2000})
 #     rd = reinterpret(Int64, data)
 #     return map!(ntoh, rd, rd)

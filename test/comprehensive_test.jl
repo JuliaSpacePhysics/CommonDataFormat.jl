@@ -1,14 +1,11 @@
+# Comprehensive test based on the Python CDFpp test.py
+# Tests all variables in a_cdf.cdf for expected shapes, types, values, and attributes
 using Test
 using CommonDataFormat
 import CommonDataFormat as CDF
 using Dates
 
 include("utils.jl")
-
-"""
-Comprehensive test based on the Python CDFpp test.py
-Tests all variables in a_cdf.cdf for expected shapes, types, values, and attributes
-"""
 
 # Expected variable definitions (translated from Python test.py)
 const EXPECTED_VARIABLES = Dict(
@@ -127,6 +124,12 @@ file = data_path("a_cdf.cdf")
 ds = CDFDataset(file)
 @testset "All Expected Variables Present" begin
     @test Set(keys(ds)) == Set(keys(EXPECTED_VARIABLES))
+end
+
+@testset "StaticString" begin
+    using CommonDataFormat: StaticString
+    @test typeof(ds["var_string"][1]) == StaticString{16, UInt8}
+    @test String(ds["var_string"][1]) == "This is a string"
 end
 
 @testset "DateTime Conversions" begin
