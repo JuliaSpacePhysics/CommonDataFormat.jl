@@ -5,7 +5,6 @@ using Mmap
 using Dictionaries: Dictionary
 using ResumableFunctions
 using DiskArrays
-using StaticStrings: StaticString
 using Base.Threads
 using CodecZlib: GzipDecompressor, transcode
 using LibDeflate
@@ -22,6 +21,7 @@ export is_record_varying
 include("epochs.jl")
 include("enums.jl")
 include("types.jl")
+include("staticstring.jl")
 include("parsing.jl")
 include("decompress.jl")
 include("records/records.jl")

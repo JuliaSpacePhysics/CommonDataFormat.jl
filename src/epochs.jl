@@ -149,6 +149,8 @@ function Base.show(io::IO, epoch::Epoch16)
 end
 
 Base.promote_rule(::Type{<:CDFDateTime}, ::Type{Dates.DateTime}) = Dates.DateTime
+Base.promote_rule(::Type{T}, ::Type{Dates.Date}) where {T <: CDFDateTime} = T
+# Comment out because of invalidation
 Base.convert(::Type{Dates.DateTime}, x::CDFDateTime) = Dates.DateTime(x)
 Base.bswap(x::Epoch) = Epoch(Base.bswap(x.instant))
 Base.bswap(x::Epoch16) = Epoch16(Base.bswap(x.seconds), Base.bswap(x.picoseconds))
