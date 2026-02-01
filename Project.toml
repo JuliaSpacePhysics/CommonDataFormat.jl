@@ -4,9 +4,7 @@ version = "0.1.9"
 authors = ["Beforerr <zzj956959688@gmail.com> and contributors"]
 
 [deps]
-CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
-Dictionaries = "85a47980-9c8c-11e8-2b9f-f7ca1fa99fb4"
 DiskArrays = "3c3547ce-8d99-4f5e-a174-61eb10b00ae3"
 LibDeflate = "9255714d-24a7-4b30-8ea3-d46a97f7e13b"
 Mmap = "a63ad114-7e13-5084-954f-fe012c677804"
@@ -20,10 +18,8 @@ CommonDataModel = "1fbeeb36-5f17-413c-809b-666fb144f157"
 CommonDataFormatCommonDataModelExt = ["CommonDataModel"]
 
 [compat]
-CodecZlib = "0.7"
 CommonDataModel = "0.4"
 Dates = "1"
-Dictionaries = "0.4"
 DiskArrays = "0.4"
 LibDeflate = "0.4.3"
 Mmap = "1"
