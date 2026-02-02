@@ -2,7 +2,6 @@ module CommonDataFormat
 
 using Dates
 using Mmap
-using ResumableFunctions
 using DiskArrays
 using Base.Threads
 using LibDeflate

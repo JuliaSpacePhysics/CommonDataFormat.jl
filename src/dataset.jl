@@ -133,3 +133,6 @@ function Base.show(io::IO, m::MIME"text/plain", cdf::CDFDataset)
     show(io, m, cdf.attrib)
     return
 end
+
+OffsetsIterator(cdf::CDFDataset) = 
+    OffsetsIterator{recordsize_type(cdf)}(cdf.buffer, cdf.gdr.ADRhead)

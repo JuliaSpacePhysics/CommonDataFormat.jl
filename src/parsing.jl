@@ -122,24 +122,6 @@ function readname(buf::Vector{UInt8}, offset::Int)
     return @views buf[offset:(offset + 255)]
 end
 
-@resumable function get_offsets_lazy(buffer::Vector{UInt8}, pos, ::Type{RecordSizeType}) where {RecordSizeType}
-    pos = Int(pos)
-    while pos != 0
-        @yield pos
-        pos = Int(read_be(buffer, pos + 1 + sizeof(RecordSizeType) + 4, RecordSizeType))
-    end
-end
-
-function get_offsets!(offsets, buffer::Vector{UInt8}, pos, FieldSizeType)
-    pos = Int(pos)
-    while pos != 0
-        push!(offsets, pos)
-        pos = Int(read_be(buffer, pos + 1 + sizeof(FieldSizeType) + 4, FieldSizeType))
-    end
-    return offsets
-end
-get_offsets(args...) = get_offsets!(Int[], args...)
-
 """
     is_cdf_v3(magic_bytes)
 
@@ -157,7 +139,7 @@ function is_big_endian_encoding(encoding)
     return encoding in (1, 2, 5, 7, 9, 12, 19)
 end
 
-const cdf_magic_bytes = [0xCDF30001, 0xCDF26002, 0x0000FFFF] # CDF format uses different magic numbers: CDF3.0, CDF2.x versions
+const cdf_magic_bytes = (0xCDF30001, 0xCDF26002, 0x0000FFFF) # CDF format uses different magic numbers: CDF3.0, CDF2.x versions
 
 function validate_cdf_magic(magic_bytes)
     return magic_bytes in cdf_magic_bytes

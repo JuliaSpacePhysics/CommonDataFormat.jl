@@ -1,15 +1,10 @@
 # Attribute loading functionality
 # Handles loading of ADR (Attribute Descriptor Record) and AEDR (Attribute Entry Descriptor Record) chains
 
-"""
-    load_attribute_entries(buffer::Vector{UInt8}, adr, RecordSizeType, cdf_encoding) -> Vector{AttributeEntry}
-
-Load all attribute entries for a given attribute from its AEDRs.
-"""
-@inline function load_attribute_entries(buffer::Vector{UInt8}, adr, RecordSizeType, cdf_encoding)
+# Load all attribute entries for a given attribute from its AEDRs.
+@inline function load_attribute_entries(buffer::Vector{UInt8}, adr, RecordSizeType, needs_byte_swap)
     head = max(adr.AgrEDRhead, adr.AzEDRhead)
-    offsets = get_offsets(buffer, head, RecordSizeType)
-    needs_byte_swap = is_big_endian_encoding(cdf_encoding)
+    offsets = OffsetsIterator{RecordSizeType}(buffer, head)
     return map(offsets) do offset
         load_aedr_data(buffer, offset, RecordSizeType, needs_byte_swap)
     end
@@ -23,13 +18,13 @@ Load all attributes from the CDF file.
 function attrib(cdf::CDFDataset; predicate = is_global)
     RecordSizeType = recordsize_type(cdf)
     buffer = cdf.buffer
-    cdf_encoding = cdf.cdr.encoding
-    offsets = get_offsets(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    needs_byte_swap = is_big_endian_encoding(cdf)
+    offsets = collect(OffsetsIterator(cdf))
     adrs = map(of -> ADR(buffer, of, RecordSizeType), offsets)
     adrs = filter!(predicate, adrs)
     names = map(adr -> String(adr.Name), adrs)
     aedrs = map(adrs) do adr
-        load_attribute_entries(buffer, adr, RecordSizeType, cdf_encoding)
+        load_attribute_entries(buffer, adr, RecordSizeType, needs_byte_swap)
     end
     return Dict(zip(names, aedrs))
 end
@@ -42,11 +37,12 @@ Retrieve all entries for a named attribute from the CDF file.
 function attrib(cdf::CDFDataset, name::String)
     RecordSizeType = recordsize_type(cdf)
     buffer = cdf.buffer
-    cdf_encoding = cdf.cdr.encoding
-    offsets = get_offsets_lazy(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    needs_byte_swap = is_big_endian_encoding(cdf)
+    offsets = OffsetsIterator(cdf)
+    name_bytes = codeunits(name)
     for offset in offsets
         adr = ADR(buffer, offset, RecordSizeType)
-        name == String(adr.Name) && return load_attribute_entries(buffer, adr, RecordSizeType, cdf_encoding)
+        name_bytes == adr.Name && return load_attribute_entries(buffer, adr, RecordSizeType, needs_byte_swap)
     end
     error("Attribute '$name' not found in CDF file")
 end
@@ -61,7 +57,7 @@ function vattrib(cdf::CDFDataset, varnum::Integer)
     buffer = cdf.buffer
     cdf_encoding = cdf.cdr.encoding
     attributes = Dict{String, Union{String, Vector}}()
-    offsets = get_offsets_lazy(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    offsets = OffsetsIterator(cdf)
     needs_byte_swap = is_big_endian_encoding(cdf_encoding)
     for offset in offsets
         is_global(buffer, offset, RecordSizeType) && continue
@@ -99,7 +95,7 @@ function vattrib(cdf, varnum, name)
     cdf_encoding = cdf.cdr.encoding
 
     # Search for the specific attribute by name first
-    offsets = get_offsets_lazy(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    offsets = OffsetsIterator(cdf)
     name_bytes = codeunits(name)
     needs_byte_swap = is_big_endian_encoding(cdf_encoding)
     for offset in offsets
@@ -141,7 +137,7 @@ function attribnames(cdf::CDFDataset; predicate = is_global)
     names = String[]
     buffer = cdf.buffer
     RecordSizeType = recordsize_type(cdf)
-    offsets = get_offsets_lazy(buffer, cdf.gdr.ADRhead, RecordSizeType)
+    offsets = OffsetsIterator(cdf)
     for offset in offsets
         adr = ADR(buffer, offset, RecordSizeType)
         predicate(adr) && push!(names, String(adr.Name))
