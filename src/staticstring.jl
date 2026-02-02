@@ -59,3 +59,11 @@ function Base.String(x::StaticString{N, T}) where {N, T}
     b = Base.StringVector(N)
     return String(b .= x.codeunits)
 end
+
+@inline Base.ncodeunits(::StaticString{N}) where N = N
+
+function StaticString(cu::Base.CodeUnits{T}) where T
+    N = length(cu)
+    return StaticString{N, T}(NTuple{N, T}(cu))
+end
+StaticString(s::AbstractString) = StaticString(codeunits(s))
