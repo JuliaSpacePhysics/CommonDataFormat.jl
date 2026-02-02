@@ -7,6 +7,7 @@ include("epochs_test.jl")
 include("comprehensive_test.jl")
 include("cdf2_test.jl")
 include("CommonDataModelExt_test.jl")
+include("staticstring.jl")
 
 @testset "Aqua" begin
     using Aqua
