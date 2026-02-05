@@ -1,4 +1,5 @@
 using CommonDataFormat: StaticString
+using Test
 
 @testset "StaticString" begin
     s = "Hello, World!"
@@ -8,4 +9,9 @@ using CommonDataFormat: StaticString
     @test ss == s
     @test String(ss) == s
     @test !isempty(ss)
+    @test contains(ss, "World")
+    @test occursin("World", ss)
+    @test replace(ss, "World" => "Julia") == "Hello, Julia!"
+
+    @test codeunit(ss) == UInt8
 end
