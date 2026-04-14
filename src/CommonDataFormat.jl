@@ -12,7 +12,6 @@ export CDFDataset, CDFVariable
 export Majority, CompressionType, DataType
 export Epoch, Epoch16, TT2000
 export CDF_EPOCH, CDF_EPOCH16, CDF_TIME_TT2000, CDF_CHAR, CDF_UCHAR
-export vattrib
 export is_record_varying
 
 include("epochs.jl")

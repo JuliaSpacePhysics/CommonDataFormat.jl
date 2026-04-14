@@ -63,10 +63,10 @@ function _eachchunk_vvrs(var::CDFVariable)
 end
 
 
-function Base.getproperty(var::CDFVariable, name::Symbol)
+@inline function Base.getproperty(var::CDFVariable, name::Symbol)
     name in fieldnames(CDFVariable) && return getfield(var, name)
     if name == :attrib
-        return vattrib(var.parentdataset, var.vdr.num)
+        return attrib(var)
     elseif name == :datatype
         return DataType(var.vdr.data_type)
     else
@@ -74,18 +74,11 @@ function Base.getproperty(var::CDFVariable, name::Symbol)
     end
 end
 
-function Base.getindex(var::CDFVariable, name::String)
-    at = vattrib(var.parentdataset, var.vdr.num, name)
-    isnothing(at) && throw(KeyError(name))
-    return at
-end
+Base.getindex(var::CDFVariable, name::String) = var.attrib[name]
+Base.haskey(var::CDFVariable, name::String) = haskey(var.attrib, name)
 
-function Base.haskey(var::CDFVariable, name::String)
-    return !isnothing(vattrib(var.parentdataset, var.vdr.num, name))
-end
-
-attrib(var::CDFVariable, name::String) = vattrib(var.parentdataset, var.vdr.num, name)
-attrib(var::CDFVariable) = vattrib(var.parentdataset, var.vdr.num)
+attrib(var::CDFVariable) = LazyVAttrib(var.parentdataset, var.vdr.num)
+attrib(var::CDFVariable, name::String) = get(attrib(var), name)
 
 is_record_varying(v::CDFVariable) = is_record_varying(v.vdr)
 variable_type(v::CDFVariable) = get(v.attrib, "VAR_TYPE", "unknown")
