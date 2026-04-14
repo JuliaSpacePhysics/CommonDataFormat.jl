@@ -19,14 +19,13 @@ function attrib(cdf::CDFDataset; predicate = is_global)
     RecordSizeType = recordsize_type(cdf)
     buffer = cdf.buffer
     needs_byte_swap = is_big_endian_encoding(cdf)
-    offsets = collect(OffsetsIterator(cdf))
-    adrs = map(of -> ADR(buffer, of, RecordSizeType), offsets)
-    adrs = filter!(predicate, adrs)
-    names = map(adr -> String(adr.Name), adrs)
-    aedrs = map(adrs) do adr
-        load_attribute_entries(buffer, adr, RecordSizeType, needs_byte_swap)
+    result = Dict{String, Vector}()
+    for offset in OffsetsIterator(cdf)
+        adr = ADR(buffer, offset, RecordSizeType)
+        predicate(adr) || continue
+        result[String(adr.Name)] = load_attribute_entries(buffer, adr, RecordSizeType, needs_byte_swap)
     end
-    return Dict(zip(names, aedrs))
+    return result
 end
 
 """
@@ -47,58 +46,54 @@ function attrib(cdf::CDFDataset, name::String)
     error("Attribute '$name' not found in CDF file")
 end
 
-"""
-    vattrib(cdf::CDFDataset, varnum::Integer)
+# Lazy dict-like view of variable attributes; use Dict{String,Union{String,Vector}}(x) to materialize.
+struct LazyVAttrib{CDF, N} <: AbstractDict{String, Union{String, Vector}}
+    cdf::CDF
+    varnum::N
+end
 
-Get all variable attributes for a specific variable number.
-"""
-function vattrib(cdf::CDFDataset, varnum::Integer)
-    RecordSizeType = recordsize_type(cdf)
-    buffer = cdf.buffer
-    cdf_encoding = cdf.cdr.encoding
-    attributes = Dict{String, Union{String, Vector}}()
-    offsets = OffsetsIterator(cdf)
-    needs_byte_swap = is_big_endian_encoding(cdf_encoding)
-    for offset in offsets
-        is_global(buffer, offset, RecordSizeType) && continue
+function Base.iterate(la::LazyVAttrib, offset::Int = Int(la.cdf.gdr.ADRhead))
+    offset == 0 && return nothing
+    RecordSizeType = recordsize_type(la.cdf)
+    buffer = la.cdf.buffer
+    needs_byte_swap = is_big_endian_encoding(la.cdf)
+    while offset != 0
+        # cheap scope check before parsing the full ADR (avoids Name string allocation for globals)
+        if is_global(buffer, offset, RecordSizeType)
+            offset = Int(read_be(buffer, offset + 1 + sizeof(RecordSizeType) + 4, RecordSizeType))
+            continue
+        end
         adr = ADR(buffer, offset, RecordSizeType)
+        next_offset = Int(adr.ADRnext)
         for head in (adr.AgrEDRhead, adr.AzEDRhead)
             head == 0 && continue
-            found = _search_aedr_entries(buffer, head, RecordSizeType, needs_byte_swap, varnum)
+            found = _search_aedr_entries(buffer, head, RecordSizeType, needs_byte_swap, la.varnum)
             isnothing(found) && continue
             name = String(adr.Name)
-            attributes[name] = _get_attributes(name, found, cdf)
-            break
+            return (name => _get_attributes(name, found, la.cdf), next_offset)
         end
+        offset = next_offset
     end
-    return attributes
+    return nothing
 end
 
-# Handle pointers like LABL_PTR_1
-# https://github.com/SciQLop/PyISTP/blob/0a565c39c73dd800934bc379dd7c2e00c28d23d0/pyistp/_impl.py#L16
-function _get_attributes(name, value, cdf)
-    if occursin("LABL_PTR", name)
-        return cdf[value][:]
-    end
-    return value
+Base.IteratorSize(::Type{<:LazyVAttrib}) = Base.SizeUnknown()
+Base.length(la::LazyVAttrib) = count(_ -> true, la)
+
+function Base.getindex(la::LazyVAttrib, name::String)
+    at = get(la, name)
+    isnothing(at) && throw(KeyError(name))
+    return at
 end
 
-"""
-    vattrib(cdf, varnum, name)
-
-Optimized version that loads only the requested attribute for the given variable number.
-Much faster than loading all attributes when only one is needed.
-"""
-function vattrib(cdf, varnum, name)
+function Base.get(la::LazyVAttrib, name, default = nothing)
+    cdf = la.cdf
+    varnum = la.varnum
     RecordSizeType = recordsize_type(cdf)
     buffer = cdf.buffer
-    cdf_encoding = cdf.cdr.encoding
-
-    # Search for the specific attribute by name first
-    offsets = OffsetsIterator(cdf)
     name_bytes = codeunits(name)
-    needs_byte_swap = is_big_endian_encoding(cdf_encoding)
-    for offset in offsets
+    needs_byte_swap = is_big_endian_encoding(cdf)
+    for offset in OffsetsIterator(cdf)
         is_global(buffer, offset, RecordSizeType) && continue
         adr = ADR(buffer, offset, RecordSizeType)
         adr.Name != name_bytes && continue
@@ -108,9 +103,20 @@ function vattrib(cdf, varnum, name)
             isnothing(found) && continue
             return _get_attributes(name, found, cdf)
         end
-        return nothing
+        return default
     end
-    return nothing
+    return default
+end
+
+Base.haskey(la::LazyVAttrib, name) = !isnothing(get(la, name))
+
+# Handle pointers like LABL_PTR_1
+# https://github.com/SciQLop/PyISTP/blob/0a565c39c73dd800934bc379dd7c2e00c28d23d0/pyistp/_impl.py#L16
+function _get_attributes(name, value, cdf)
+    if occursin("LABL_PTR", name)
+        return cdf[value][:]
+    end
+    return value
 end
 
 @inline function _search_aedr_entries(source, aedr_head, RecordSizeType, needs_byte_swap, target_varnum)
@@ -137,8 +143,7 @@ function attribnames(cdf::CDFDataset; predicate = is_global)
     names = String[]
     buffer = cdf.buffer
     RecordSizeType = recordsize_type(cdf)
-    offsets = OffsetsIterator(cdf)
-    for offset in offsets
+    for offset in OffsetsIterator(cdf)
         adr = ADR(buffer, offset, RecordSizeType)
         predicate(adr) && push!(names, String(adr.Name))
     end
