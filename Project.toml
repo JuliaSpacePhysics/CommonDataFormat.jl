@@ -3,6 +3,9 @@ uuid = "a9737db6-c05c-4e48-868b-6bc41491d9d9"
 version = "0.1.14"
 authors = ["Beforerr <zzj956959688@gmail.com> and contributors"]
 
+[workspace]
+projects = ["docs", "test"]
+
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DiskArrays = "3c3547ce-8d99-4f5e-a174-61eb10b00ae3"
