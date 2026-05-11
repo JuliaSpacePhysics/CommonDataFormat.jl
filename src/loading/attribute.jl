@@ -86,7 +86,7 @@ function Base.getindex(la::LazyVAttrib, name::String)
     return at
 end
 
-function Base.get(la::LazyVAttrib, name, default = nothing)
+function Base.get(la::LazyVAttrib, name::AbstractString, default = nothing)
     cdf = la.cdf
     varnum = la.varnum
     RecordSizeType = recordsize_type(cdf)
@@ -108,7 +108,8 @@ function Base.get(la::LazyVAttrib, name, default = nothing)
     return default
 end
 
-Base.haskey(la::LazyVAttrib, name) = !isnothing(get(la, name))
+Base.haskey(la::LazyVAttrib, name::AbstractString) = !isnothing(get(la, name, nothing))
+Base.haskey(la::LazyVAttrib, name) = false
 
 # Handle pointers like LABL_PTR_1
 # https://github.com/SciQLop/PyISTP/blob/0a565c39c73dd800934bc379dd7c2e00c28d23d0/pyistp/_impl.py#L16
