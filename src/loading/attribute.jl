@@ -80,8 +80,8 @@ end
 Base.IteratorSize(::Type{<:LazyVAttrib}) = Base.SizeUnknown()
 Base.length(la::LazyVAttrib) = count(_ -> true, la)
 
-function Base.getindex(la::LazyVAttrib, name::String)
-    at = get(la, name)
+function Base.getindex(la::LazyVAttrib, name::AbstractString)
+    at = get(la, name, nothing)
     isnothing(at) && throw(KeyError(name))
     return at
 end
@@ -107,6 +107,8 @@ function Base.get(la::LazyVAttrib, name::AbstractString, default = nothing)
     end
     return default
 end
+
+Base.get(la::LazyVAttrib, name, default = nothing) = default
 
 Base.haskey(la::LazyVAttrib, name::AbstractString) = !isnothing(get(la, name, nothing))
 Base.haskey(la::LazyVAttrib, name) = false
