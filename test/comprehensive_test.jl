@@ -195,3 +195,12 @@ const EXPECTED_GLOBAL_ATTRIBUTES = Dict{String, Any}(
         @test attribs[attr_name] == expected_value
     end
 end
+
+@testset "LazyVAttrib haskey key types" begin
+    var = ds["var"]
+    la = var.attrib
+    @test haskey(la, "DEPEND0")           # String — present
+    @test !haskey(la, :DEPEND0)            # Symbol — coerced to String
+    @test !haskey(la, "nonexistent")      # String — absent
+    @test !haskey(la, 42)                 # other type — false, no error
+end
