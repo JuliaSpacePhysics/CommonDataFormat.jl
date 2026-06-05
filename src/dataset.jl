@@ -1,14 +1,15 @@
-struct CDFDataset{CT, FST}
+struct CDFDataset{FST}
     filename::String
     cdr::CDR{FST}
     gdr::GDR{FST}
     buffer::Vector{UInt8}
+    compression::CompressionType
 end
 
 Base.parent(cdf::CDFDataset) = getfield(cdf, :buffer)
 GDR(cdf::CDFDataset) = getfield(cdf, :gdr)
 filename(cdf::CDFDataset) = getfield(cdf, :filename)
-recordsize_type(::CDFDataset{CT, RS}) where {CT, RS} = RS
+recordsize_type(::CDFDataset{RS}) where {RS} = RS
 
 """
     CDFDataset(filename)
@@ -22,21 +23,27 @@ cdf = CDFDataset("data.cdf")
 """
 function CDFDataset(filename)
     fname = String(filename)
-    return open(fname, "r") do io
+    # `open(f, name, mode) do` form: routes through varargs splatting (`_apply_iterate`) which `juliac --trim` can't resolve.
+    io = open(fname, "r")
+    try
         buffer = Mmap.mmap(io)
         magic_bytes = read_be(buffer, 1, UInt32)
         @assert validate_cdf_magic(magic_bytes)
-
-        FieldSizeType = is_cdf_v3(magic_bytes) ? Int64 : Int32
-        compression = NoCompression
-        if is_compressed(read_be(buffer, 5, UInt32))
-            buffer, compression = decompress_bytes(buffer, FieldSizeType)
-        end
-        # Parse CDF header
-        cdr = CDR(buffer, 8, FieldSizeType)
-        gdr = GDR(buffer, Int(cdr.gdr_offset), FieldSizeType)
-        return CDFDataset{compression, FieldSizeType}(fname, cdr, gdr, buffer)
+        return is_cdf_v3(magic_bytes) ? _load_dataset(fname, buffer, Int64) :
+            _load_dataset(fname, buffer, Int32)
+    finally
+        close(io)
     end
+end
+
+function _load_dataset(fname, buffer, ::Type{FieldSizeType}) where {FieldSizeType}
+    compression = NoCompression
+    if is_compressed(read_be(buffer, 5, UInt32))
+        buffer, compression = decompress_bytes(buffer, FieldSizeType)
+    end
+    cdr = CDR(buffer, 8, FieldSizeType)
+    gdr = GDR(buffer, Int(cdr.gdr_offset), FieldSizeType)
+    return CDFDataset{FieldSizeType}(fname, cdr, gdr, buffer, compression)
 end
 
 is_big_endian_encoding(cdf::CDFDataset) = is_big_endian_encoding(cdf.cdr.encoding)
@@ -45,23 +52,16 @@ is_compressed(magic_numbers::UInt32) = magic_numbers != 0x0000FFFF
 majority(cdf::CDFDataset) = majority(cdf.cdr)
 
 # Convenience accessors for the dataset with lazy loading
-@inline function Base.getproperty(cdf::CDFDataset{CT, FST}, name::Symbol) where {CT, FST}
+@inline function Base.getproperty(cdf::CDFDataset, name::Symbol)
+    # Real fields FIRST so internal accesses (`cdf.cdr`, `cdf.gdr`, …) short-circuit and
+    # never traverse the lazy `attrib` branches below.
     name in fieldnames(CDFDataset) && return getfield(cdf, name)
-    if name === :version
-        return version(cdf.cdr)
-    elseif name === :majority
-        return majority(cdf)
-    elseif name === :compression
-        return CT
-    elseif name === :adr
-        return ADR(parent(cdf), GDR(cdf).ADRhead, recordsize_type(cdf))
-    elseif name === :attrib
-        return attrib(cdf)
-    elseif name === :vattrib
-        return attrib(cdf; predicate = !is_global)
-    else
-        throw(ArgumentError("Unknown property $name"))
-    end
+    name === :version && return version(getfield(cdf, :cdr))
+    name === :majority && return majority(cdf)
+    name === :adr && return ADR(parent(cdf), GDR(cdf).ADRhead, recordsize_type(cdf))
+    name === :attrib && return attrib(cdf)
+    name === :vattrib && return attrib(cdf; predicate = !is_global)
+    throw(ArgumentError("Unknown property $name"))
 end
 
 function find_vdr(cdf::CDFDataset, var_name::String)
@@ -134,5 +134,5 @@ function Base.show(io::IO, m::MIME"text/plain", cdf::CDFDataset)
     return
 end
 
-OffsetsIterator(cdf::CDFDataset) = 
+OffsetsIterator(cdf::CDFDataset) =
     OffsetsIterator{recordsize_type(cdf)}(cdf.buffer, cdf.gdr.ADRhead)

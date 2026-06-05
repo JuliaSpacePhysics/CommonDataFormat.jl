@@ -48,6 +48,48 @@ function variable(cdf::CDFDataset, name)
     )
 end
 
+"""
+    read!(ds::CDFDataset, name, dest::AbstractArray{T, N}) -> dest
+
+Read the full contents of variable `name` into the preallocated `dest`.
+
+Statically-typed entry point: `T` and `N` come from `dest` instead of the file, so —
+unlike `ds[name]`, whose type is only known at runtime — the call chain is resolvable
+at compile time and survives `juliac --trim`.
+"""
+function Base.read!(ds::CDFDataset, name::String, dest::AbstractArray{T, N}) where {T, N}
+    vdr = find_vdr(ds, name)
+    isnothing(vdr) && throw(KeyError(name))
+    return _read_full!(dest, ds, name, vdr)
+end
+
+"""
+    read(ds::CDFDataset, name, ::Type{Array{T, N}}) -> Array{T, N}
+
+Allocating variant of [`read!`](@ref): read the full contents of variable `name` into a
+freshly allocated `Array{T, N}`.
+"""
+function Base.read(ds::CDFDataset, name::String, ::Type{Array{T, N}}) where {T, N}
+    vdr = find_vdr(ds, name)
+    isnothing(vdr) && throw(KeyError(name))
+    dims = (map(Int, record_sizes(vdr, Val(N - 1)))..., Int(vdr.max_rec) + 1)
+    return _read_full!(Array{T, N}(undef, dims), ds, name, vdr)
+end
+
+function _read_full!(dest::AbstractArray{T, N}, ds, name, vdr) where {T, N}
+    Base.require_one_based_indexing(dest)
+    Tfile = julia_type(vdr.data_type, vdr.num_elems)
+    T === Tfile || throw(ArgumentError("element type mismatch for \"$name\": file has $Tfile, destination has $T"))
+    dims = (map(Int, record_sizes(vdr, Val(N - 1)))..., Int(vdr.max_rec) + 1)
+    size(dest) == dims || throw(DimensionMismatch("variable \"$name\" has size $dims, destination has size $(size(dest))"))
+    var = CDFVariable{T, N, typeof(vdr), typeof(ds)}(name, vdr, ds, dims)
+    DiskArrays.readblock!(var, dest, axes(dest)...)
+    return dest
+end
+
+@inline _record_view(A::AbstractArray{<:Any, M}, r) where {M} =
+    view(A, ntuple(_ -> Colon(), M - 1)..., r)
+
 function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, ranges::Vararg{AbstractUnitRange{<:Integer}, N}; nbuffers = nthreads()) where {T, N}
     N > 0 && @boundscheck checkbounds(var, ranges...)
     isempty(dest) && return dest
@@ -100,7 +142,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
             if is_full_record && entry.first >= first_rec && entry.last <= last_rec
                 # full entry
                 dest_range = dst_src_ranges(first_rec, last_rec, entry)[1]
-                dest_view = selectdim(dest, N, dest_range)
+                dest_view = _record_view(dest, dest_range)
                 total_elems = record_size * length(entry)
                 decompressor = take!(decompressors())
                 load_cvvr_data!(dest_view, 1, buffer, entry.offset, total_elems, RecordSizeType, compression; decompressor)
@@ -109,7 +151,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
             else
                 # partial entry
                 (dest_range, local_range) = dst_src_ranges(first_rec, last_rec, entry)
-                dest_view = selectdim(dest, N, dest_range)
+                dest_view = _record_view(dest, dest_range)
                 n_records = length(entry)
                 total_elems = record_size * n_records
                 chunk = Vector{T}(undef, total_elems)

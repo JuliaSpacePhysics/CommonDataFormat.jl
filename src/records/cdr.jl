@@ -27,7 +27,7 @@ is_cdf_v3(cdr::CDR) = cdr.version == 3
 Load a CDF Descriptor Record from the IO stream at the specified offset.
 This follows the CDF specification for CDR record structure.
 """
-@inline function CDR(buffer::Vector{UInt8}, offset, FieldSizeT)
+@inline function CDR(buffer::Vector{UInt8}, offset, ::Type{FieldSizeT}) where {FieldSizeT}
     pos = check_record_type(1, buffer, offset, FieldSizeT)
     # Read remaining CDR fields in order as per CDF specification
     fields, pos = read_be_fields(buffer, pos, CDR{FieldSizeT}, Val(1:9))

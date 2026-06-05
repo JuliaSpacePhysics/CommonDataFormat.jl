@@ -4,10 +4,8 @@ using Downloads
 
 const SUITE = BenchmarkGroup()
 
-# elb file is committed to the repo, so it ships with the package at any rev
 const ELX_FILE = joinpath(pkgdir(CommonDataFormat), "data", "elb_l2_epdef_20210914_v01.cdf")
 
-# mms file (50 MB) is gitignored; download once and cache across revisions
 function download_data(url, filename = basename(url))
     dir = joinpath(tempdir(), "CommonDataFormat_benchmark_data")
     mkpath(dir)

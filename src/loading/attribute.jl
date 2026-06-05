@@ -2,7 +2,7 @@
 # Handles loading of ADR (Attribute Descriptor Record) and AEDR (Attribute Entry Descriptor Record) chains
 
 # Load all attribute entries for a given attribute from its AEDRs.
-@inline function load_attribute_entries(buffer::Vector{UInt8}, adr, RecordSizeType, needs_byte_swap)
+@inline function load_attribute_entries(buffer::Vector{UInt8}, adr, ::Type{RecordSizeType}, needs_byte_swap) where {RecordSizeType}
     head = max(adr.AgrEDRhead, adr.AzEDRhead)
     offsets = OffsetsIterator{RecordSizeType}(buffer, head)
     return map(offsets) do offset
@@ -122,7 +122,7 @@ function _get_attributes(name, value, cdf)
     return value
 end
 
-@inline function _search_aedr_entries(source, aedr_head, RecordSizeType, needs_byte_swap, target_varnum)
+@inline function _search_aedr_entries(source, aedr_head, ::Type{RecordSizeType}, needs_byte_swap, target_varnum) where {RecordSizeType}
     aedr_head == 0 && return nothing
     offset = Int(aedr_head)
     _num_offset = 13 + 2 * sizeof(RecordSizeType)

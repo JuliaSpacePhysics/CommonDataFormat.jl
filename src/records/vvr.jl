@@ -9,7 +9,7 @@ struct VVR{T}
     data::Vector{T}     # Raw variable data
 end
 
-@inline function VVR(buffer::Vector{UInt8}, offset, RecordSizeType, data)
+@inline function VVR(buffer::Vector{UInt8}, offset, ::Type{RecordSizeType}, data) where {RecordSizeType}
     pos = offset + 1
     header = Header(buffer, pos, RecordSizeType)
     @assert header.record_type == 7 "Invalid VVR record type"
@@ -25,7 +25,7 @@ function _copy_to!(dest, doffs, src, soffs, N)
     end
 end
 
-function load_vvr_data!(data::Vector{T}, pos, src::Vector{UInt8}, offset, N, RecordSizeType) where {T}
+function load_vvr_data!(data::Vector{T}, pos, src::Vector{UInt8}, offset, N, ::Type{RecordSizeType}) where {T, RecordSizeType}
     src_start = offset + 1 + sizeof(RecordSizeType) + sizeof(Int32)
     _copy_to!(data, pos, src, src_start, N)
     return

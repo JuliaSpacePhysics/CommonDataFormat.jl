@@ -89,6 +89,30 @@ end
     return read_be(vdr.buffer, vdr.pos, vdr.num_dims, Int32)
 end
 
+# Static-arity variants for the typed `read!` path: the caller supplies the dimension
+# count via `Val`, so tuple lengths stay inferable under `juliac --trim`. They avoid the
+# runtime-length tuples (and `collect`/logical indexing for rVDR) of the methods above.
+function record_sizes(vdr::VDR, ::Val{M}) where {M}
+    vdr.num_dims == M ||
+        throw(DimensionMismatch("variable has $(vdr.num_dims) dimensions, expected $M"))
+    return read_be(vdr.buffer, vdr.pos, Val(M), Int32)
+end
+
+function record_sizes(vdr::rVDR, ::Val{M}) where {M}
+    gdr = vdr.gdr
+    buf = vdr.buffer
+    sizes_pos = gdr.pos + sizeof(Int64) + 3 * sizeof(Int32) # mirrors `r_dim_sizes`
+    sizes = zeros(Int32, M)
+    count = 0
+    for i in 1:Int(gdr.r_num_dims)
+        read_be(buf, vdr.pos + (i - 1) * 4, Int32) == 0 && continue
+        count += 1
+        count <= M && (sizes[count] = read_be(buf, sizes_pos + (i - 1) * 4, Int32))
+    end
+    count == M || throw(DimensionMismatch("variable has $count dimensions, expected $M"))
+    return ntuple(i -> sizes[i], Val(M))
+end
+
 function Base.size(vdr::AbstractVDR)
     records = vdr.max_rec + 1
     dims = (record_sizes(vdr)..., records)
