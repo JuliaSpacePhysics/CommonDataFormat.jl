@@ -113,6 +113,16 @@ function record_sizes(vdr::rVDR, ::Val{M}) where {M}
     return ntuple(i -> sizes[i], Val(M))
 end
 
+num_record_dims(vdr::VDR) = Int(vdr.num_dims)
+function num_record_dims(vdr::rVDR)
+    n = 0
+    for i in 1:Int(vdr.gdr.r_num_dims)
+        n += read_be(vdr.buffer, vdr.pos + (i - 1) * 4, Int32) != 0
+    end
+    return n
+end
+
+
 function Base.size(vdr::AbstractVDR)
     records = vdr.max_rec + 1
     dims = (record_sizes(vdr)..., records)

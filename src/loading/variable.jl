@@ -40,22 +40,41 @@ end
 function variable(cdf::CDFDataset, name)
     vdr = find_vdr(cdf, name)
     isnothing(vdr) && throw(KeyError(name))
-    T = julia_type(vdr.data_type, vdr.num_elems)
-    dims = (record_sizes(vdr)..., vdr.max_rec + 1)
-    N = vdr isa VDR ? vdr.num_dims + 1 : length(dims)
-    return CDFVariable{T, N, typeof(vdr), typeof(cdf)}(
-        name, vdr, cdf, dims
+    return _variable(cdf, name, vdr)
+end
+
+# Branch over dimension count so each leaf builds dims tuple at compile time statically
+function _variable(cdf, name, vdr)
+    M = num_record_dims(vdr)
+    return Base.Cartesian.@nif 12 d -> (M == d - 1) d -> (
+        d == 12 ? throw(ArgumentError("variable has $M dimensions; the CDF format allows at most 10")) :
+            _variable(cdf, name, vdr, Val(d - 1))
     )
 end
+
+function _variable(cdf, name, vdr, ::Val{M}) where {M}
+    dims = (map(Int, record_sizes(vdr, Val(M)))..., Int(vdr.max_rec) + 1)
+    code = Int(vdr.data_type)
+    if code == 51 || code == 52 # CHAR/UCHAR: eltype depends on runtime num_elems
+        T = StaticString{Int(vdr.num_elems), UInt8}
+        return CDFVariable{T, M + 1, typeof(vdr), typeof(cdf)}(name, vdr, cdf, dims)
+    end
+    # Branch to static constructor per element type
+    return Base.Cartesian.@nif(
+        16,
+        d -> code == CODE_TYPE_PAIRS[d][1],
+        d -> _construct(cdf, name, vdr, dims, CODE_TYPE_PAIRS[d][2]),
+        d -> throw(ArgumentError("unsupported CDF data type $code"))
+    )
+end
+
+@inline _construct(cdf, name, vdr, dims::NTuple{N, Int}, ::Type{T}) where {N, T} =
+    CDFVariable{T, N, typeof(vdr), typeof(cdf)}(name, vdr, cdf, dims)
 
 """
     read!(ds::CDFDataset, name, dest::AbstractArray{T, N}) -> dest
 
 Read the full contents of variable `name` into the preallocated `dest`.
-
-Statically-typed entry point: `T` and `N` come from `dest` instead of the file, so —
-unlike `ds[name]`, whose type is only known at runtime — the call chain is resolvable
-at compile time and survives `juliac --trim`.
 """
 function Base.read!(ds::CDFDataset, name::String, dest::AbstractArray{T, N}) where {T, N}
     vdr = find_vdr(ds, name)
