@@ -1,6 +1,6 @@
-precompile(Array, (CDFVariable{TT2000, 1, VDR{Int64}, CDFDataset{NoCompression, Int64}},))
+precompile(Array, (CDFVariable{TT2000, 1, VDR{Int64}, CDFDataset{Int64}},))
 for T in (Float32, Float64), i in 1:3
-    precompile(Array, (CDFVariable{T, i, VDR{Int64}, CDFDataset{NoCompression, Int64}},))
+    precompile(Array, (CDFVariable{T, i, VDR{Int64}, CDFDataset{Int64}},))
 end
 
 PrecompileTools.@setup_workload begin

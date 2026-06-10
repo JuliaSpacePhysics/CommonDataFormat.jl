@@ -7,10 +7,9 @@ struct CPR <: Record
     # parameters::Tuple{Vararg{Int32}}
 end
 
-@inline function CPR(buffer::Vector{UInt8}, offset, FieldSizeT)
+@inline function CPR(buffer::Vector{UInt8}, offset, ::Type{FieldSizeT}) where {FieldSizeT}
     pos = check_record_type(11, buffer, offset, FieldSizeT)
-    fields, pos = @read_be_fields(buffer, pos, fieldtypes(CPR)...)
-    # parameter_count, pos = read_be_i(buffer, pos, Int32)
+    fields, pos = read_be_fields(buffer, pos, CPR, Val(1:3))
     # parameters = read_be(buffer, pos, parameter_count, Int32)
     return CPR(fields...)
 end

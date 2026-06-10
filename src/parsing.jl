@@ -21,6 +21,11 @@ end
     return ntuple(j -> read_be(v, i + (j - 1) * S, T), n)
 end
 
+@inline function read_be(v::Vector{UInt8}, i, ::Val{M}, T) where {M}
+    S = sizeof(T)
+    return ntuple(j -> read_be(v, i + (j - 1) * S, T), Val(M))
+end
+
 @inline function read_be_i(v::Vector{UInt8}, i, T::Base.DataType)
     return read_be(v, i, T), i + _sizeof(T)
 end
@@ -32,58 +37,20 @@ end
 
 const name_bytes_buffer = Vector{UInt8}(undef, 256)
 
-"""
-    @read_be_fields buffer pos T1 T2 ...
-
-Unrolls sequential big-endian reads starting at `pos` within `buffer`.
-Returns a tuple of the parsed values and the updated position, mirroring
-`read_be_i` but without the runtime `ntuple`/offset bookkeeping.
-
-# Example
-
-```julia
-values, next = @read_be_fields buf pos UInt32 Int16
-```
-"""
-macro read_be_fields(buffer, pos, Ts...)
-    isempty(Ts) && error("@read_be_fields requires at least one field type")
-
-    types = flatten_field_types(__module__, Ts)
-    buf = esc(buffer)
-    start = esc(pos)
-    pos_sym = gensym(:pos)
-    value_syms = [gensym(:field) for _ in types]
-
-    stmts = Any[:(local $pos_sym = $start)]
-    for (sym, T) in zip(value_syms, types)
-        Tesc = esc(T)
-        push!(stmts, :(local $sym = read_be($buf, $pos_sym, $Tesc)))
-        push!(stmts, :($pos_sym += _sizeof($Tesc)))
-    end
-
-    tuple_expr = Expr(:tuple, value_syms...)
-    push!(stmts, :(($tuple_expr, $pos_sym)))
-
-    return Expr(:block, stmts...)
-end
-
 # Optimized version using loop unrolling for better performance
 @generated function read_be_fields(buffer::Vector{UInt8}, pos::Integer, ::Type{SType}, ::Val{indxs}) where {SType, indxs}
     exprs = Expr[]
     value_syms = [gensym(:field) for _ in 1:length(indxs)]
     pos_sym = gensym(:pos)
 
-    # Initialize position
     push!(exprs, :(local $pos_sym = pos))
 
-    # Read each field
     for (i, idx) in enumerate(indxs)
         T = fieldtype(SType, idx)
         push!(exprs, :(local $(value_syms[i]) = read_be(buffer, $pos_sym, $T)))
         push!(exprs, :($pos_sym += _sizeof($T)))
     end
 
-    # Return tuple of values and final position
     tuple_expr = Expr(:tuple, value_syms...)
     push!(exprs, :(($tuple_expr, $pos_sym)))
 

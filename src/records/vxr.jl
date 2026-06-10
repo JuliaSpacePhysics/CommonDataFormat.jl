@@ -18,7 +18,7 @@ end
 
 Load a Variable Index Record from the source at the specified offset.
 """
-function VXR(source::Vector{UInt8}, offset, FieldSizeT)
+function VXR(source::Vector{UInt8}, offset, ::Type{FieldSizeT}) where {FieldSizeT}
     pos = check_record_type(6, source, offset, FieldSizeT)
     vxr_next, pos = read_be_i(source, pos, FieldSizeT)
     n_entries, pos = read_be_i(source, pos, Int32)

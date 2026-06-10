@@ -2,7 +2,7 @@ include("decompress/rle.jl")
 include("decompress/gzip.jl")
 
 
-function decompress_bytes(buffer, RecordSizeType)
+function decompress_bytes(buffer, ::Type{RecordSizeType}) where {RecordSizeType}
     ccr = CCR(buffer, 8, RecordSizeType)
     cpr = CPR(buffer, Int(ccr.cpr_offset), RecordSizeType)
     compression = CompressionType(cpr.compression_type)

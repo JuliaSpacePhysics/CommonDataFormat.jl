@@ -11,22 +11,22 @@ struct Header
     record_type::Int32
 end
 
-@inline function Header(buf::Vector{UInt8}, pos, FieldSizeT)
+@inline function Header(buf::Vector{UInt8}, pos, ::Type{FieldSizeT}) where {FieldSizeT}
     record_size = Int64(read_be(buf, pos, FieldSizeT))
     record_type = read_be(buf, pos + sizeof(FieldSizeT), Int32)
     return Header(record_size, record_type)
 end
 
-get_record_type(buffer, offset, FieldSizeT) = read_be(buffer, offset + sizeof(FieldSizeT) + 1, Int32)
+get_record_type(buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT} = read_be(buffer, offset + sizeof(FieldSizeT) + 1, Int32)
 
-@inline function check_record_type(record_type::Integer, buffer, offset, FieldSizeT)
+@inline function check_record_type(record_type::Integer, buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT}
     pos = offset + sizeof(FieldSizeT) + 1
     header_type = read_be(buffer, pos, Int32)
     @assert header_type == record_type
     return pos + sizeof(Int32)
 end
 
-@inline function check_record_type(record_types, buffer, offset, FieldSizeT)
+@inline function check_record_type(record_types, buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT}
     pos = offset + sizeof(FieldSizeT) + 1
     header_type = read_be(buffer, pos, Int32)
     @assert header_type in record_types
@@ -44,7 +44,6 @@ include("cpr.jl")
 include("ccr.jl")
 include("cvvr.jl")
 
-# Utility functions to decode CDR flags
 """
     decode_cdr_flags(flags::UInt32)
 
@@ -65,7 +64,6 @@ function decode_cdr_flags(flags)
     )
 end
 
-# Pretty printing for CDR structure
 function Base.show(io::IO, cdr::CDR)
     flag_info = decode_cdr_flags(cdr.flags)
 

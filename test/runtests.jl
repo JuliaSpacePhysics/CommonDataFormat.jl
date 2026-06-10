@@ -14,9 +14,18 @@ include("staticstring.jl")
     Aqua.test_all(CommonDataFormat)
 end
 
+const RUN_JET_TESTS = isempty(VERSION.prerelease)
+
 @testset "JET" begin
-    using JET
-    JET.test_package(CommonDataFormat; target_modules = [CommonDataFormat])
+    if RUN_JET_TESTS
+        using Pkg; Pkg.add("JET"); Pkg.instantiate()
+        using JET
+        JET.test_package(CommonDataFormat; target_modules = [CommonDataFormat])
+    end
+end
+
+@testset "Trim" begin
+    include("trim.jl")
 end
 
 @testset "Fill Value" begin
@@ -36,6 +45,30 @@ end
     @test occursin("Version: 3.9.0", string(ds))
     display(ds)
     display(ds["var"])
+end
+
+@testset "read! typed entry point" begin
+    ds = CDFDataset(data_path("a_cdf.cdf"))
+    v = read!(ds, "var", Vector{Float64}(undef, 101))
+    @test v == ds["var"][:]
+    m = read!(ds, "var2d_counter", Matrix{Float64}(undef, 10, 10))
+    @test m == reshape(0.0:99.0, 10, 10)
+    @test_throws KeyError read!(ds, "nonexistent", zeros(1))
+    @test_throws ArgumentError read!(ds, "var", zeros(Float32, 101))
+    @test_throws DimensionMismatch read!(ds, "var", zeros(100))
+    @test_throws DimensionMismatch read!(ds, "var", zeros(101, 1))
+
+    @test read(ds, "var", Vector{Float64}) == v
+    @test read(ds, "var2d_counter", Matrix{Float64}) == m
+    @test_throws KeyError read(ds, "nonexistent", Vector{Float64})
+    @test_throws ArgumentError read(ds, "var", Vector{Float32})
+    @test_throws DimensionMismatch read(ds, "var", Matrix{Float64})
+
+    rds = CDFDataset(data_path("ac_h0_mfi_20230102_v07.cdf"))
+    rvar = rds["BGSEc"]
+    b = read!(rds, "BGSEc", Matrix{eltype(rvar)}(undef, size(rvar)))
+    @test b == rvar[:, :]
+    @test read(rds, "BGSEc", Matrix{eltype(rvar)}) == b
 end
 
 @testset "Compressed cdf file (gzip)" begin
