@@ -19,8 +19,6 @@ struct rVDR{FST} <: AbstractVDR{FST}
     # blocking_factor::Int32
     # name::S         # Variable name
     pos::Int
-    buffer::Vector{UInt8}
-    gdr::GDR{FST}
 end
 
 """
@@ -45,7 +43,6 @@ struct VDR{FST} <: AbstractVDR{FST}
     # name::S         # Variable name
     num_dims::Int32   # Number of dimensions
     pos::Int
-    buffer::Vector{UInt8}
     # z_dim_sizes::Tuple{Vararg{Int32}}  # Dimension sizes (z-variables only)
     # dim_varys::Tuple{Vararg{Int32}}    # Dimension variance flags
 end
@@ -62,46 +59,34 @@ Load a z-Variable Descriptor Record from the buffer at the specified offset.
 
     pos = FieldSizeT == Int64 ? offset + 340 + 1 : offset + 128 + 1
     z_num_dims, pos = read_be_i(buffer, pos, Int32)
-    return VDR{FieldSizeT}(fields..., z_num_dims, pos, buffer)
+    return VDR{FieldSizeT}(fields..., z_num_dims, pos)
 end
 
 """
-    rVDR{FieldSizeT}(buffer, offset, gdr)
+    rVDR{FieldSizeT}(buffer, offset)
 
 Load an r-Variable Descriptor Record from the buffer at the specified offset.
 """
-@inline function rVDR{FieldSizeT}(buffer::Vector{UInt8}, offset, gdr) where {FieldSizeT}
+@inline function rVDR{FieldSizeT}(buffer::Vector{UInt8}, offset) where {FieldSizeT}
     pos = check_record_type(3, buffer, offset, FieldSizeT)
     fields, pos = read_be_fields(buffer, pos, rVDR{FieldSizeT}, Val(1:13))
     pos = FieldSizeT == Int64 ? offset + 340 + 1 : offset + 128 + 1
-    return rVDR{FieldSizeT}(fields..., pos, buffer, gdr)
+    return rVDR{FieldSizeT}(fields..., pos)
 end
 
-
-@inline function record_sizes(vdr::rVDR)
-    gdr = vdr.gdr
-    buffer = vdr.buffer
-    dim_varys = collect(read_be(buffer, vdr.pos, gdr.r_num_dims, Int32))
-    return r_dim_sizes(gdr, buffer)[dim_varys .!= 0]
-end
-
-@inline function record_sizes(vdr::VDR)
-    return read_be(vdr.buffer, vdr.pos, vdr.num_dims, Int32)
-end
 
 # Static-arity variants for the typed `read!` path: the caller supplies the dimension
-# count via `Val`, so tuple lengths stay inferable under `juliac --trim`. They avoid the
-# runtime-length tuples (and `collect`/logical indexing for rVDR) of the methods above.
-function record_sizes(vdr::VDR, ::Val{M}) where {M}
+# count via `Val`, so tuple lengths stay inferable under `juliac --trim`.
+function record_sizes(vdr::VDR, cdf, ::Val{M}) where {M}
     vdr.num_dims == M ||
         throw(DimensionMismatch("variable has $(vdr.num_dims) dimensions, expected $M"))
-    return read_be(vdr.buffer, vdr.pos, Val(M), Int32)
+    return read_be(parent(cdf), vdr.pos, Val(M), Int32)
 end
 
-function record_sizes(vdr::rVDR, ::Val{M}) where {M}
-    gdr = vdr.gdr
-    buf = vdr.buffer
-    sizes_pos = gdr.pos + sizeof(Int64) + 3 * sizeof(Int32) # mirrors `r_dim_sizes`
+function record_sizes(vdr::rVDR, cdf, ::Val{M}) where {M}
+    gdr = GDR(cdf)
+    buf = parent(cdf)
+    sizes_pos = gdr.pos + sizeof(Int64) + 3 * sizeof(Int32)
     sizes = zeros(Int32, M)
     count = 0
     for i in 1:Int(gdr.r_num_dims)
@@ -113,24 +98,18 @@ function record_sizes(vdr::rVDR, ::Val{M}) where {M}
     return ntuple(i -> sizes[i], Val(M))
 end
 
-num_record_dims(vdr::VDR) = Int(vdr.num_dims)
-function num_record_dims(vdr::rVDR)
+num_record_dims(vdr::VDR, cdf) = Int(vdr.num_dims)
+function num_record_dims(vdr::rVDR, cdf)
     n = 0
-    for i in 1:Int(vdr.gdr.r_num_dims)
-        n += read_be(vdr.buffer, vdr.pos + (i - 1) * 4, Int32) != 0
+    for i in 1:Int(GDR(cdf).r_num_dims)
+        n += read_be(parent(cdf), vdr.pos + (i - 1) * 4, Int32) != 0
     end
     return n
 end
 
 
-function Base.size(vdr::AbstractVDR)
-    records = vdr.max_rec + 1
-    dims = (record_sizes(vdr)..., records)
-    return Int.(dims)
-end
-
 function Base.show(io::IO, vdr::AbstractVDR)
-    print(io, "VDR: ", Base.dims2string(size(vdr)), " (", CDFDataType(vdr.data_type), ")")
+    print(io, "VDR: ", CDFDataType(vdr.data_type))
     is_nrv(vdr) && print(io, " [NRV]")
     is_compressed(vdr) && print(io, " [compressed]")
     return
@@ -141,10 +120,10 @@ end
 # 1 Whether or not a pad value is specified for this variable. Set indicates that a pad value has been specified. Clear indicates that a pad value has not been specified. The PadValue field described below is only present if a pad value has been specified.
 # 2 Whether or not a compression method might be applied to this variable data. Set indicates that a compression is chosen by the user and the data might be compressed, depending on the data size and content. If the compressed data becomes larger than its uncompressed data, no compression is applied and the data are stored as uncompressed, even the compression bit is set. The compressed data is stored in Compressed Variable Value Record (CVVR) while uncompressed data go into Variable Value Record (VVR). Clear indicates that a compression will not be used. The CPRorSPRoffset field provides the offset of the Compressed Parameters Record if this compression bit is set and the compression used.
 
-function read_vvrs(vdr::AbstractVDR{FieldSizeT}) where {FieldSizeT}
+function read_vvrs(vdr::AbstractVDR{FieldSizeT}, cdf) where {FieldSizeT}
     vxr_head = vdr.vxr_head
     entries = Vector{VVREntry}()
-    src = vdr.buffer
+    src = parent(cdf)
     sizehint!(entries, 1)
     vvr_type = collect_vxr_entries!(entries, src, Int(vxr_head), FieldSizeT)
     vvr_type = @something vvr_type VVR_

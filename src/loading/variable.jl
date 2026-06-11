@@ -45,7 +45,7 @@ end
 
 # Branch over dimension count so each leaf builds dims tuple at compile time statically
 function _variable(cdf, name, vdr)
-    M = num_record_dims(vdr)
+    M = num_record_dims(vdr, cdf)
     return Base.Cartesian.@nif 12 d -> (M == d - 1) d -> (
         d == 12 ? throw(ArgumentError("variable has $M dimensions; the CDF format allows at most 10")) :
             _variable(cdf, name, vdr, Val(d - 1))
@@ -53,7 +53,7 @@ function _variable(cdf, name, vdr)
 end
 
 function _variable(cdf, name, vdr, ::Val{M}) where {M}
-    dims = (map(Int, record_sizes(vdr, Val(M)))..., Int(vdr.max_rec) + 1)
+    dims = (map(Int, record_sizes(vdr, cdf, Val(M)))..., Int(vdr.max_rec) + 1)
     code = Int(vdr.data_type)
     if code == 51 || code == 52 # CHAR/UCHAR: eltype depends on runtime num_elems
         T = StaticString{Int(vdr.num_elems), UInt8}
@@ -91,7 +91,7 @@ freshly allocated `Array{T, N}`.
 function Base.read(ds::CDFDataset, name::String, ::Type{Array{T, N}}) where {T, N}
     vdr = find_vdr(ds, name)
     isnothing(vdr) && throw(KeyError(name))
-    dims = (map(Int, record_sizes(vdr, Val(N - 1)))..., Int(vdr.max_rec) + 1)
+    dims = (map(Int, record_sizes(vdr, ds, Val(N - 1)))..., Int(vdr.max_rec) + 1)
     return _read_full!(Array{T, N}(undef, dims), ds, name, vdr)
 end
 
@@ -99,7 +99,7 @@ function _read_full!(dest::AbstractArray{T, N}, ds, name, vdr) where {T, N}
     Base.require_one_based_indexing(dest)
     Tfile = julia_type(vdr.data_type, vdr.num_elems)
     T === Tfile || throw(ArgumentError("element type mismatch for \"$name\": file has $Tfile, destination has $T"))
-    dims = (map(Int, record_sizes(vdr, Val(N - 1)))..., Int(vdr.max_rec) + 1)
+    dims = (map(Int, record_sizes(vdr, ds, Val(N - 1)))..., Int(vdr.max_rec) + 1)
     size(dest) == dims || throw(DimensionMismatch("variable \"$name\" has size $dims, destination has size $(size(dest))"))
     var = CDFVariable{T, N, typeof(vdr), typeof(ds)}(name, vdr, ds, dims)
     DiskArrays.readblock!(var, dest, axes(dest)...)
@@ -115,10 +115,10 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
 
     buffer = parent(var.parentdataset)
     RecordSizeType = recordsize_type(var.parentdataset)
-    entries, vvr_type = read_vvrs(var.vdr)
+    entries, vvr_type = read_vvrs(var.vdr, var.parentdataset)
     isempty(entries) && return dest
     compression = if !isempty(entries) #  # vvr records is the ultimative source
-        vvr_type == VVR_ ? NoCompression : variable_compression(var.vdr)
+        vvr_type == VVR_ ? NoCompression : variable_compression(var.vdr, var.parentdataset)
     else
         NoCompression
     end
@@ -220,10 +220,10 @@ function collect_vxr_entries!(entries::Vector{VVREntry}, src, offset, ::Type{Fie
     return vvr_type
 end
 
-function variable_compression(vdr::AbstractVDR{FieldSizeT}) where {FieldSizeT}
+function variable_compression(vdr::AbstractVDR{FieldSizeT}, cdf) where {FieldSizeT}
     offset_value = Int(vdr.cpr_or_spr_offset)
     if is_compressed(vdr) && offset_value != 0
-        buffer = vdr.buffer
+        buffer = parent(cdf)
         cpr = CPR(buffer, offset_value, FieldSizeT)
         return CompressionType(cpr.compression_type)
     end

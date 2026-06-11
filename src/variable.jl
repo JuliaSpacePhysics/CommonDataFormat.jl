@@ -46,7 +46,7 @@ function _eachchunk(var::CDFVariable)
 end
 
 function _eachchunk_vvrs(var::CDFVariable)
-    vvrs, _ = read_vvrs(var.vdr)
+    vvrs, _ = read_vvrs(var.vdr, var.parentdataset)
     N = ndims(var)
     chunks = ntuple(N) do i
         if i != N
