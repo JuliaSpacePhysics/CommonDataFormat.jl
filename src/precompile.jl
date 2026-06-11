@@ -8,5 +8,9 @@ PrecompileTools.@setup_workload begin
 
     PrecompileTools.@compile_workload begin
         ds = CDFDataset(elx_file)
+        for name in keys(ds)
+            var = ds[name]
+            isempty(var) || var[1]
+        end
     end
 end
