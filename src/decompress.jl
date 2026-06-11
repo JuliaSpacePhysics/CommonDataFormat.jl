@@ -22,7 +22,8 @@ end
 
 function decompress_bytes(data, compression::CompressionType; expected_bytes::Union{Nothing, Int} = nothing)
     compression == NoCompression && return data
-    @assert compression in (GzipCompression, RLECompression)
+    compression in (GzipCompression, RLECompression) ||
+        throw(ArgumentError("unsupported compression: $compression"))
     result = if compression == GzipCompression
         decompressor = Decompressor()
         input = convert(Vector{UInt8}, data)
@@ -44,15 +45,18 @@ end
 function decompress_bytes!(decompressor, dest, doffs, src::AbstractVector{UInt8}, soffs, N, n_in, compression::CompressionType)
     if compression == NoCompression
         _copy_to!(dest, doffs, src, soffs, N)
-        return
-    end
-    @assert compression in (GzipCompression, RLECompression)
-    n_out = N * sizeof(eltype(dest))
-    out_ptr = pointer(dest, doffs)
-    in_ptr = pointer(src, soffs)
-    return if compression == GzipCompression
-        out = _unsafe_gzip_decompress!(decompressor, out_ptr, n_out, in_ptr, n_in)
-        @assert !(out isa LibDeflateError) out
+    elseif compression == GzipCompression
+        n_out = N * sizeof(eltype(dest))
+        GC.@preserve dest src begin
+            out = _unsafe_gzip_decompress!(decompressor, pointer(dest, doffs), n_out, pointer(src, soffs), n_in)
+            out isa LibDeflateError && throw(ArgumentError("gzip decompression failed: $out"))
+        end
     elseif compression == RLECompression
+        n_out = N * sizeof(eltype(dest))
+        out = _rle_decompress(view(src, soffs:(soffs + n_in - 1)), n_out)
+        _copy_to!(dest, doffs, out, 1, N)
+    else
+        throw(ArgumentError("unsupported variable compression: $compression"))
     end
+    return
 end
