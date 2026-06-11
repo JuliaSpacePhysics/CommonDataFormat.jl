@@ -51,11 +51,11 @@ struct VDR{FST} <: AbstractVDR{FST}
 end
 
 """
-    VDR(io::IO, FieldSizeT)
+    VDR{FieldSizeT}(buffer, offset)
 
-Load a Variable Descriptor Record from the IO stream at the specified offset.
+Load a z-Variable Descriptor Record from the buffer at the specified offset.
 """
-@inline function VDR(buffer::Vector{UInt8}, offset, ::Type{FieldSizeT}) where {FieldSizeT}
+@inline function VDR{FieldSizeT}(buffer::Vector{UInt8}, offset) where {FieldSizeT}
     pos = check_record_type(8, buffer, offset, FieldSizeT)
     fields, pos = read_be_fields(buffer, pos, VDR{FieldSizeT}, Val(1:13))
     # name = readname(buffer, pos)
@@ -66,11 +66,11 @@ Load a Variable Descriptor Record from the IO stream at the specified offset.
 end
 
 """
-    rVDR(io::IO, FieldSizeT)
+    rVDR{FieldSizeT}(buffer, offset, gdr)
 
-Load a Variable Descriptor Record from the IO stream at the specified offset.
+Load an r-Variable Descriptor Record from the buffer at the specified offset.
 """
-@inline function rVDR(buffer::Vector{UInt8}, offset, gdr, ::Type{FieldSizeT}) where {FieldSizeT}
+@inline function rVDR{FieldSizeT}(buffer::Vector{UInt8}, offset, gdr) where {FieldSizeT}
     pos = check_record_type(3, buffer, offset, FieldSizeT)
     fields, pos = read_be_fields(buffer, pos, rVDR{FieldSizeT}, Val(1:13))
     pos = FieldSizeT == Int64 ? offset + 340 + 1 : offset + 128 + 1

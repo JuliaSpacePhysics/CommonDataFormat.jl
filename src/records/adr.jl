@@ -24,15 +24,10 @@ is_global(buffer, offset, ::Type{Int32}) = read_be(buffer, offset + 17, Int32) =
 is_global(buffer, offset, ::Type{Int64}) = read_be(buffer, offset + 29, Int32) == 1
 
 
-"""
-    ADR(buf, offset, RecordSizeType)
-
-Load an Attribute Descriptor Record from the buffer at the specified position.
-"""
-@inline function ADR(buffer::Vector{UInt8}, offset, ::Type{RecordSizeType}) where {RecordSizeType}
-    pos = check_record_type(4, buffer, offset, RecordSizeType)
+@inline function ADR{FST}(buffer::Vector{UInt8}, offset) where {FST}
+    pos = check_record_type(4, buffer, offset, FST)
     # Read ADR fields
-    fields, pos = read_be_fields(buffer, pos, ADR{RecordSizeType, String}, Val(1:11))
+    fields, pos = read_be_fields(buffer, pos, ADR{FST, String}, Val(1:11))
     name = readname(buffer, pos)
     return ADR(fields..., name)
 end

@@ -21,7 +21,7 @@ function attrib(cdf::CDFDataset; predicate = is_global)
     needs_byte_swap = is_big_endian_encoding(cdf)
     result = Dict{String, Vector}()
     for offset in OffsetsIterator(cdf)
-        adr = ADR(buffer, offset, RecordSizeType)
+        adr = ADR{RecordSizeType}(buffer, offset)
         predicate(adr) || continue
         result[String(adr.Name)] = load_attribute_entries(buffer, adr, RecordSizeType, needs_byte_swap)
     end
@@ -33,15 +33,14 @@ end
 
 Retrieve all entries for a named attribute from the CDF file.
 """
-function attrib(cdf::CDFDataset, name::String)
-    RecordSizeType = recordsize_type(cdf)
+function attrib(cdf::CDFDataset{FST}, name::String) where {FST}
     buffer = cdf.buffer
     needs_byte_swap = is_big_endian_encoding(cdf)
     offsets = OffsetsIterator(cdf)
     name_bytes = codeunits(name)
     for offset in offsets
-        adr = ADR(buffer, offset, RecordSizeType)
-        name_bytes == adr.Name && return load_attribute_entries(buffer, adr, RecordSizeType, needs_byte_swap)
+        adr = ADR{FST}(buffer, offset)
+        name_bytes == adr.Name && return load_attribute_entries(buffer, adr, FST, needs_byte_swap)
     end
     error("Attribute '$name' not found in CDF file")
 end
@@ -63,7 +62,7 @@ function Base.iterate(la::LazyVAttrib, offset::Int = Int(la.cdf.gdr.ADRhead))
             offset = Int(read_be(buffer, offset + 1 + sizeof(RecordSizeType) + 4, RecordSizeType))
             continue
         end
-        adr = ADR(buffer, offset, RecordSizeType)
+        adr = ADR{RecordSizeType}(buffer, offset)
         next_offset = Int(adr.ADRnext)
         for head in (adr.AgrEDRhead, adr.AzEDRhead)
             head == 0 && continue
@@ -95,7 +94,7 @@ function Base.get(la::LazyVAttrib, name::AbstractString, default = nothing)
     needs_byte_swap = is_big_endian_encoding(cdf)
     for offset in OffsetsIterator(cdf)
         is_global(buffer, offset, RecordSizeType) && continue
-        adr = ADR(buffer, offset, RecordSizeType)
+        adr = ADR{RecordSizeType}(buffer, offset)
         adr.Name != name_bytes && continue
         for head in (adr.AgrEDRhead, adr.AzEDRhead)
             head == 0 && continue
@@ -142,12 +141,11 @@ end
 
 Return a list of attribute names in the CDF file.
 """
-function attribnames(cdf::CDFDataset; predicate = is_global)
+function attribnames(cdf::CDFDataset{FST}; predicate = is_global) where {FST}
     names = String[]
     buffer = cdf.buffer
-    RecordSizeType = recordsize_type(cdf)
     for offset in OffsetsIterator(cdf)
-        adr = ADR(buffer, offset, RecordSizeType)
+        adr = ADR{FST}(buffer, offset)
         predicate(adr) && push!(names, String(adr.Name))
     end
     return names

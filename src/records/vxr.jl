@@ -12,27 +12,21 @@ struct VXR{FieldSizeT}
     # offset::Tuple{Vararg{Int64}}  # Offsets to VVR/CVVR records
 end
 
-
-"""
-    VXR(source, offset, RecordSizeType)
-
-Load a Variable Index Record from the source at the specified offset.
-"""
-function VXR(source::Vector{UInt8}, offset, ::Type{FieldSizeT}) where {FieldSizeT}
-    pos = check_record_type(6, source, offset, FieldSizeT)
-    vxr_next, pos = read_be_i(source, pos, FieldSizeT)
+function VXR{FST}(source::Vector{UInt8}, offset) where {FST}
+    pos = check_record_type(6, source, offset, FST)
+    vxr_next, pos = read_be_i(source, pos, FST)
     n_entries, pos = read_be_i(source, pos, Int32)
     n_used_entries, pos = read_be_i(source, pos, Int32)
     p = convert(Ptr{Int32}, pointer(source, pos))
     return VXR(vxr_next, n_entries, n_used_entries, p)
 end
 
-function Base.iterate(vxr::VXR{FieldSizeT}, state = 1) where {FieldSizeT}
+function Base.iterate(vxr::VXR{FST}, state = 1) where {FST}
     state > vxr.n_used_entries && return nothing
     pointer = vxr.pointer
     first = read_be(pointer, state)
     last = read_be(pointer, state + vxr.n_entries)
-    offset_pointer = convert(Ptr{FieldSizeT}, pointer + (2 * vxr.n_entries) * sizeof(Int32))
+    offset_pointer = convert(Ptr{FST}, pointer + (2 * vxr.n_entries) * sizeof(Int32))
     offset = read_be(offset_pointer, state)
     return ((first, last, Int(offset)), state + 1)
 end
