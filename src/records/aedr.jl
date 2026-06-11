@@ -10,7 +10,7 @@ struct AEDR{FST, A}
     # header::Header
     AEDRnext::FST     # Offset to next AEDR in chain
     AttrNum::Int32      # Attribute number
-    DataType::Int32     # CDF data type of the entry
+    CDFDataType::Int32     # CDF data type of the entry
     Num::Int32          # Entry number
     NumElems::Int32     # Number of elements in the entry
     NumStrings::Int32   # Number of strings (for string data)
@@ -41,7 +41,7 @@ function load_attribute_data(::Type{T}, buffer::Vector{UInt8}, pos, NumElems, ne
     dst_ptr = pointer(data)
     src_ptr = convert(Ptr{T}, pointer(buffer, pos))
     unsafe_copyto!(dst_ptr, src_ptr, NumElems)
-    needs_byte_swap && _btye_swap!(data)
+    needs_byte_swap && _byte_swap!(data)
     return data
 end
 

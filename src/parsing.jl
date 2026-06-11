@@ -35,9 +35,7 @@ end
     return ntuple(j -> read_be(v, i + (j - 1) * S, T), n), i + n * S
 end
 
-const name_bytes_buffer = Vector{UInt8}(undef, 256)
-
-# Optimized version using loop unrolling for better performance
+# Optimized version using loop unrolling
 @generated function read_be_fields(buffer::Vector{UInt8}, pos::Integer, ::Type{SType}, ::Val{indxs}) where {SType, indxs}
     exprs = Expr[]
     value_syms = [gensym(:field) for _ in 1:length(indxs)]
@@ -72,14 +70,6 @@ function flatten_field_types(mod, args)
     return types
 end
 
-# Read variable name (null-terminated string, up to 256 chars)
-@inline function readname(io::IO)
-    read!(io, name_bytes_buffer)
-    null_pos = findfirst(==(0x00), name_bytes_buffer)
-    pos = isnothing(null_pos) ? 256 : null_pos - 1
-    return @views String(name_bytes_buffer[1:pos])
-end
-
 function readname(buf::Vector{UInt8}, offset::Int)
     for i in offset:(offset + 255)
         if buf[i] == 0x00
@@ -112,9 +102,9 @@ function validate_cdf_magic(magic_bytes)
     return magic_bytes in cdf_magic_bytes
 end
 
-_btye_swap!(data) = map!(ntoh, data, data)
-_btye_swap!(data::AbstractArray{<:StaticString{N}}) where {N} = data
-# function _btye_swap!(data::AbstractArray{TT2000})
+_byte_swap!(data) = map!(ntoh, data, data)
+_byte_swap!(data::AbstractArray{<:StaticString{N}}) where {N} = data
+# function _byte_swap!(data::AbstractArray{TT2000})
 #     rd = reinterpret(Int64, data)
 #     return map!(ntoh, rd, rd)
 # end

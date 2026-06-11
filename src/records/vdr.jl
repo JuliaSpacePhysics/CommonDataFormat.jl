@@ -130,7 +130,7 @@ function Base.size(vdr::AbstractVDR)
 end
 
 function Base.show(io::IO, vdr::AbstractVDR)
-    print(io, "VDR: ", Base.dims2string(size(vdr)), " (", DataType(vdr.data_type), ")")
+    print(io, "VDR: ", Base.dims2string(size(vdr)), " (", CDFDataType(vdr.data_type), ")")
     is_nrv(vdr) && print(io, " [NRV]")
     is_compressed(vdr) && print(io, " [compressed]")
     return
