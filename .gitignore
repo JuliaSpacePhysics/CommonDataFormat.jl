@@ -8,3 +8,4 @@ ref/
 .claude/
 data/.*
 data/*
+!/data/a_sparse_cdf.cdf
