@@ -164,9 +164,12 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
                 dest_view = _record_view(dest, dest_range)
                 total_elems = record_size * length(entry)
                 decompressor = take!(decompressors())
-                load_cvvr_data!(dest_view, 1, buffer, entry.offset, total_elems, RecordSizeType, compression; decompressor)
-                is_row_major && majority_swap!(dest_view, dims_without_record)
-                put!(decompressors(), decompressor)
+                try
+                    load_cvvr_data!(dest_view, 1, buffer, entry.offset, total_elems, RecordSizeType, compression; decompressor)
+                    is_row_major && majority_swap!(dest_view, dims_without_record)
+                finally
+                    put!(decompressors(), decompressor)
+                end
             else
                 # partial entry
                 (dest_range, local_range) = dst_src_ranges(first_rec, last_rec, entry)
@@ -179,8 +182,11 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
                     load_vvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType)
                 else
                     decompressor = take!(decompressors())
-                    load_cvvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType, compression; decompressor)
-                    put!(decompressors(), decompressor)
+                    try
+                        load_cvvr_data!(chunk, 1, buffer, entry.offset, total_elems, RecordSizeType, compression; decompressor)
+                    finally
+                        put!(decompressors(), decompressor)
+                    end
                 end
 
                 # chunk_data = _load_entry_chunk(var, entry, RecordSizeType, buffer, var.compression; decompressor)
