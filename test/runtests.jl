@@ -38,6 +38,16 @@ end
     @test string(Epoch(-1.0e31)) == "FILLVAL"
 end
 
+@testset "close" begin
+    ds = CDFDataset(data_path("a_cdf.cdf"))
+    v = ds["var"][:]
+    @test isnothing(close(ds))
+    cds = CDFDataset(data_path("a_compressed_cdf.cdf"))
+    @test cds["var"][:] == v # compressed data lives in memory; close is a no-op
+    @test isnothing(close(cds))
+    @test cds["var"][:] == v
+end
+
 @testset "Uncompressed cdf file" begin
     file = data_path("a_cdf.cdf")
     ds = CDFDataset(file)

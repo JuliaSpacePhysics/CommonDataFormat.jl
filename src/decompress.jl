@@ -49,7 +49,7 @@ function decompress_bytes!(decompressor, dest, doffs, src::AbstractVector{UInt8}
         n_out = N * sizeof(eltype(dest))
         GC.@preserve dest src begin
             out = _unsafe_gzip_decompress!(decompressor, pointer(dest, doffs), n_out, pointer(src, soffs), n_in)
-            out isa LibDeflateError && throw(ArgumentError("gzip decompression failed: $out"))
+            out isa LibDeflateError && throw(ArgumentError("gzip decompression failed"))
         end
     elseif compression == RLECompression
         n_out = N * sizeof(eltype(dest))

@@ -39,12 +39,16 @@ end
 function _load_dataset(fname, buffer, ::Type{FieldSizeType}) where {FieldSizeType}
     compression = NoCompression
     if is_compressed(read_be(buffer, 5, UInt32))
+        mmapped = buffer
         buffer, compression = decompress_bytes(buffer, FieldSizeType)
+        finalize(mmapped)
     end
     cdr = CDR(buffer, 8, FieldSizeType)
     gdr = GDR(buffer, Int(cdr.gdr_offset), FieldSizeType)
     return CDFDataset{FieldSizeType}(fname, cdr, gdr, buffer, compression)
 end
+
+Base.close(cdf::CDFDataset) = (finalize(parent(cdf)); nothing)
 
 is_big_endian_encoding(cdf::CDFDataset) = is_big_endian_encoding(cdf.cdr.encoding)
 
