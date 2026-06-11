@@ -116,12 +116,11 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
     buffer = parent(var.parentdataset)
     RecordSizeType = recordsize_type(var.parentdataset)
     entries, vvr_type = read_vvrs(var.vdr)
+    # vvr record type is the ultimate source of compression
+    compression = vvr_type == VVR_ ? NoCompression : variable_compression(var.vdr)
+    sparse_type(var.vdr) == 0 ||
+        return _readblock_sparse!(var, dest, ranges, entries, compression, buffer, RecordSizeType)
     isempty(entries) && return dest
-    compression = if !isempty(entries) #  # vvr records is the ultimative source
-        vvr_type == VVR_ ? NoCompression : variable_compression(var.vdr)
-    else
-        NoCompression
-    end
 
     record_range = ranges[end]
     other_ranges = ranges[1:(N - 1)]
@@ -192,6 +191,65 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
         end
     end
     is_big_endian_encoding(var) && _byte_swap!(dest)
+    return dest
+end
+
+# Sparse records: records absent from the VXR are virtual. Pad sparse (1) fills them
+# with the VDR pad value (or the NASA default pad); previous sparse (2) repeats the
+# last record of the preceding physical block.
+# Mirrors cdflib semantics; spec'd in the CDF IFD (sRecords).
+function _readblock_sparse!(var::CDFVariable{T, N}, dest, ranges, entries, compression, buffer, ::Type{RST}) where {T, N, RST}
+    record_range = ranges[end]
+    other_ranges = ranges[1:(N - 1)]
+    dims_without_record = var.dims[1:(N - 1)]
+    record_size = prod(dims_without_record)
+    is_row_major = majority(var) == Row
+    needs_byte_swap = is_big_endian_encoding(var)
+    use_prev = sparse_type(var.vdr) == 2
+    pad = pad_value(var.vdr, T, needs_byte_swap)
+
+    chunk = Vector{T}()
+    cached = 0
+    # load (and permute, for row-major) a physical block once; runs of records from
+    # the same block (incl. prev-sparse repeats) reuse it
+    load_block = function (idx)
+        entry = entries[idx]
+        if cached != idx
+            resize!(chunk, record_size * length(entry))
+            if compression == NoCompression
+                load_vvr_data!(chunk, 1, buffer, entry.offset, length(chunk), RST)
+            else
+                decompressor = take!(decompressors())
+                try
+                    load_cvvr_data!(chunk, 1, buffer, entry.offset, length(chunk), RST, compression; decompressor)
+                finally
+                    put!(decompressors(), decompressor)
+                end
+            end
+            is_row_major && majority_swap!(reshape(chunk, dims_without_record..., :), dims_without_record)
+            cached = idx
+        end
+        return reshape(chunk, dims_without_record..., :)
+    end
+
+    blk = 1
+    nblocks = length(entries)
+    for (di, r) in enumerate(record_range)
+        while blk <= nblocks && entries[blk].last < r
+            blk += 1
+        end
+        dest_view = _record_view(dest, di)
+        if blk <= nblocks && entries[blk].first <= r
+            arr = load_block(blk)
+            dest_view .= view(arr, other_ranges..., r - entries[blk].first + 1)
+        elseif use_prev && blk > 1
+            arr = load_block(blk - 1)
+            dest_view .= view(arr, other_ranges..., size(arr, N))
+        else
+            fill!(dest_view, pad)
+        end
+    end
+    needs_byte_swap && _byte_swap!(dest)
     return dest
 end
 

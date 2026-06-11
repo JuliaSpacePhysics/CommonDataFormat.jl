@@ -8,6 +8,7 @@ include("comprehensive_test.jl")
 include("cdf2_test.jl")
 include("CommonDataModelExt_test.jl")
 include("decompress_test.jl")
+include("sparse_test.jl")
 @testset "StaticString" begin
     include("staticstring.jl")
 end

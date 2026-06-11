@@ -154,4 +154,40 @@ end
 is_record_varying(vdr) = !is_nrv(vdr)
 """Whether or not the variable is a non-record variable"""
 is_nrv(vdr) = (vdr.flags & 0x01) == 0
+has_pad_value(vdr::AbstractVDR) = (vdr.flags & 0x02) != 0
 is_compressed(vdr::AbstractVDR) = (vdr.flags & 0x04) != 0
+
+# sRecords: 0 = none, 1 = pad sparse, 2 = previous-record sparse
+sparse_type(vdr::AbstractVDR) = Int(vdr.s_records)
+
+# PadValue trails zDimSizes+DimVarys (zVDR) / DimVarys (rVDR), both starting at vdr.pos
+_pad_value_pos(vdr::VDR) = vdr.pos + 8 * Int(vdr.num_dims)
+_pad_value_pos(vdr::rVDR) = vdr.pos + 4 * Int(vdr.gdr.r_num_dims)
+
+# Returned in file encoding: virtual records are filled before the final byte swap
+# in `readblock!`, which fixes pad and physical data together.
+function pad_value(vdr::AbstractVDR, ::Type{T}, needs_byte_swap) where {T}
+    if has_pad_value(vdr)
+        buf = vdr.buffer
+        return GC.@preserve buf unsafe_load(convert(Ptr{T}, pointer(buf, _pad_value_pos(vdr))))
+    end
+    return _file_encode(default_pad(T), needs_byte_swap)
+end
+
+_file_encode(x, needs_byte_swap) = needs_byte_swap ? hton(x) : x
+_file_encode(x::StaticString, needs_byte_swap) = x # excluded from byte swap
+
+# NASA CDF library default pad values (≠ ISTP FILLVAL)
+default_pad(::Type{Int8}) = Int8(-127)
+default_pad(::Type{Int16}) = Int16(-32767)
+default_pad(::Type{Int32}) = Int32(-2147483647)
+default_pad(::Type{Int64}) = Int64(-9223372036854775807)
+default_pad(::Type{UInt8}) = UInt8(254)
+default_pad(::Type{UInt16}) = UInt16(65534)
+default_pad(::Type{UInt32}) = UInt32(4294967294)
+default_pad(::Type{Float32}) = Float32(-1.0e30)
+default_pad(::Type{Float64}) = -1.0e30
+default_pad(::Type{Epoch}) = Epoch(-1.0e30)
+default_pad(::Type{Epoch16}) = Epoch16(-1.0e30, -1.0e30)
+default_pad(::Type{TT2000}) = TT2000(Int64(-9223372036854775807))
+default_pad(::Type{StaticString{N, UInt8}}) where {N} = StaticString{N, UInt8}(ntuple(_ -> UInt8(' '), Val(N)))
