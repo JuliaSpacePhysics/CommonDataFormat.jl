@@ -38,6 +38,16 @@ end
     @test string(Epoch(-1.0e31)) == "FILLVAL"
 end
 
+@testset "iteration" begin
+    for file in ("a_cdf.cdf", "ac_h0_mfi_20230102_v07.cdf") # z-only and r+z chains
+        ds = CDFDataset(data_path(file))
+        @test length(ds) == length(keys(ds))
+        @test [v.name for v in ds] == keys(ds)
+    end
+    ds = CDFDataset(data_path("a_cdf.cdf"))
+    @test haskey(ds, "var") && !haskey(ds, "nonexistent")
+end
+
 @testset "close" begin
     ds = CDFDataset(data_path("a_cdf.cdf"))
     v = ds["var"][:]

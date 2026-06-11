@@ -68,6 +68,16 @@ majority(cdf::CDFDataset) = majority(cdf.cdr)
     throw(ArgumentError("Unknown property $name"))
 end
 
+# Load the (z or r) VDR at a known offset
+function _vdr_at(cdf::CDFDataset, offset::Int)
+    buffer = parent(cdf)
+    RecordSizeType = recordsize_type(cdf)
+    record_type = read_be(buffer, offset + 1 + sizeof(RecordSizeType), Int32)
+    @assert record_type in (8, 3)
+    return record_type == 8 ? VDR(buffer, offset, RecordSizeType) :
+        rVDR(buffer, offset, GDR(cdf), RecordSizeType)
+end
+
 function find_vdr(cdf::CDFDataset, var_name::String)
     gdr = GDR(cdf)
     RecordSizeType = recordsize_type(cdf)
@@ -77,13 +87,7 @@ function find_vdr(cdf::CDFDataset, var_name::String)
     for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
         while current_offset != 0
             if readname(buffer, current_offset + vdr_name_offset) == var_name_bytes
-                record_type = read_be(buffer, current_offset + 1 + sizeof(RecordSizeType), Int32)
-                @assert record_type in (8, 3)
-                if record_type == 8
-                    return VDR(buffer, current_offset, RecordSizeType)
-                else
-                    return rVDR(buffer, current_offset, gdr, RecordSizeType)
-                end
+                return _vdr_at(cdf, Int(current_offset))
             end
             current_offset = read_be(buffer, current_offset + 5 + sizeof(RecordSizeType), RecordSizeType)
         end
@@ -96,7 +100,7 @@ function Base.getindex(cdf::CDFDataset, var_name::String)
     return variable(cdf, var_name)
 end
 
-Base.length(cdf::CDFDataset) = length(keys(cdf))
+Base.length(cdf::CDFDataset) = Int(GDR(cdf).NrVars + GDR(cdf).NzVars)
 
 function Base.keys(cdf::CDFDataset)
     RecordSizeType = recordsize_type(cdf)
@@ -116,17 +120,30 @@ function Base.keys(cdf::CDFDataset)
     return varnames
 end
 
-Base.haskey(cdf::CDFDataset, var_name::String) = var_name in keys(cdf)
+Base.haskey(cdf::CDFDataset, var_name::String) = !isnothing(find_vdr(cdf, var_name))
 
-Base.iterate(cdf::CDFDataset, state = 1) = state > length(cdf) ? nothing : (cdf[keys(cdf)[state]], state + 1)
+# Walk the rVDR then zVDR chain directly; state = (offset, still_in_r_chain)
+function Base.iterate(cdf::CDFDataset, state = (Int(GDR(cdf).rVDRhead), true))
+    offset, in_rchain = state
+    if offset == 0
+        in_rchain || return nothing
+        offset, in_rchain = Int(GDR(cdf).zVDRhead), false
+        offset == 0 && return nothing
+    end
+    RecordSizeType = recordsize_type(cdf)
+    buffer = parent(cdf)
+    name = String(readname(buffer, offset + 45 + 5 * sizeof(RecordSizeType)))
+    var = _variable(cdf, name, _vdr_at(cdf, offset))
+    next_offset = Int(read_be(buffer, offset + 5 + sizeof(RecordSizeType), RecordSizeType))
+    return (var, (next_offset, in_rchain))
+end
 
 function Base.show(io::IO, m::MIME"text/plain", cdf::CDFDataset)
     println(io, typeof(cdf))
     println(io, "path: ", cdf.filename)
     println(io, "variables:")
-    for key in keys(cdf)
-        var = cdf[key]
-        print(io, "  ", key, " : ", size(var), " ")
+    for var in cdf
+        print(io, "  ", var.name, " : ", size(var), " ")
         printstyled(io, variable_type(var); bold = true)
         print(io, " ", CDFDataType(var.vdr.data_type))
         !isempty(var) && print(io, " [", var[1], " … ", var[end], "]")
