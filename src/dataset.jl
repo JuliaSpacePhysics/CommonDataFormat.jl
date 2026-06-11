@@ -124,7 +124,7 @@ function Base.show(io::IO, m::MIME"text/plain", cdf::CDFDataset)
         var = cdf[key]
         print(io, "  ", key, " : ", size(var), " ")
         printstyled(io, variable_type(var); bold = true)
-        print(io, " ", DataType(var.vdr.data_type))
+        print(io, " ", CDFDataType(var.vdr.data_type))
         !isempty(var) && print(io, " [", var[1], " … ", var[end], "]")
         println(io)
     end

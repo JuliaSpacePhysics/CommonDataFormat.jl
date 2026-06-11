@@ -191,7 +191,7 @@ function DiskArrays.readblock!(var::CDFVariable{T, N}, dest::AbstractArray{T}, r
             end
         end
     end
-    is_big_endian_encoding(var) && _btye_swap!(dest)
+    is_big_endian_encoding(var) && _byte_swap!(dest)
     return dest
 end
 

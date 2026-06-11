@@ -68,7 +68,7 @@ end
     if name == :attrib
         return attrib(var)
     elseif name == :datatype
-        return DataType(var.vdr.data_type)
+        return CDFDataType(var.vdr.data_type)
     else
         throw(ArgumentError("Unknown property $name"))
     end
