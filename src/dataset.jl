@@ -29,23 +29,23 @@ function CDFDataset(filename)
         buffer = Mmap.mmap(io)
         magic_bytes = read_be(buffer, 1, UInt32)
         @assert validate_cdf_magic(magic_bytes)
-        return is_cdf_v3(magic_bytes) ? _load_dataset(fname, buffer, Int64) :
-            _load_dataset(fname, buffer, Int32)
+        return is_cdf_v3(magic_bytes) ? CDFDataset{Int64}(fname, buffer) :
+            CDFDataset{Int32}(fname, buffer)
     finally
         close(io)
     end
 end
 
-function _load_dataset(fname, buffer, ::Type{FieldSizeType}) where {FieldSizeType}
+function CDFDataset{FST}(fname, buffer) where {FST}
     compression = NoCompression
     if is_compressed(read_be(buffer, 5, UInt32))
         mmapped = buffer
-        buffer, compression = decompress_bytes(buffer, FieldSizeType)
+        buffer, compression = decompress_bytes(buffer, FST)
         finalize(mmapped)
     end
-    cdr = CDR(buffer, 8, FieldSizeType)
-    gdr = GDR(buffer, Int(cdr.gdr_offset), FieldSizeType)
-    return CDFDataset{FieldSizeType}(fname, cdr, gdr, buffer, compression)
+    cdr = CDR{FST}(buffer, 8)
+    gdr = GDR{FST}(buffer, Int(cdr.gdr_offset))
+    return CDFDataset{FST}(fname, cdr, gdr, buffer, compression)
 end
 
 Base.close(cdf::CDFDataset) = (finalize(parent(cdf)); nothing)
@@ -62,20 +62,19 @@ majority(cdf::CDFDataset) = majority(cdf.cdr)
     name in fieldnames(CDFDataset) && return getfield(cdf, name)
     name === :version && return version(getfield(cdf, :cdr))
     name === :majority && return majority(cdf)
-    name === :adr && return ADR(parent(cdf), GDR(cdf).ADRhead, recordsize_type(cdf))
+    name === :adr && return ADR{recordsize_type(cdf)}(parent(cdf), GDR(cdf).ADRhead)
     name === :attrib && return attrib(cdf)
     name === :vattrib && return attrib(cdf; predicate = !is_global)
     throw(ArgumentError("Unknown property $name"))
 end
 
 # Load the (z or r) VDR at a known offset
-function _vdr_at(cdf::CDFDataset, offset::Int)
+function _vdr_at(cdf::CDFDataset{FST}, offset::Int) where {FST}
     buffer = parent(cdf)
-    RecordSizeType = recordsize_type(cdf)
-    record_type = read_be(buffer, offset + 1 + sizeof(RecordSizeType), Int32)
+    record_type = read_be(buffer, offset + 1 + sizeof(FST), Int32)
     @assert record_type in (8, 3)
-    return record_type == 8 ? VDR(buffer, offset, RecordSizeType) :
-        rVDR(buffer, offset, GDR(cdf), RecordSizeType)
+    return record_type == 8 ? VDR{FST}(buffer, offset) :
+        rVDR{FST}(buffer, offset, GDR(cdf))
 end
 
 function find_vdr(cdf::CDFDataset, var_name::String)

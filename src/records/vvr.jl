@@ -1,6 +1,3 @@
-# Variable data loading functionality
-# Handles VVR (Variable Value Record) parsing and data extraction
-
 """
 Variable Value Record (VVR) - contains actual variable data
 """

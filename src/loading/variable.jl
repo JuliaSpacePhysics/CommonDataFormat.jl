@@ -204,7 +204,7 @@ end
 function collect_vxr_entries!(entries::Vector{VVREntry}, src, offset, ::Type{FieldSizeT}) where {FieldSizeT}
     vvr_type = nothing
     while offset != 0
-        vxr = VXR(src, offset, FieldSizeT)
+        vxr = VXR{FieldSizeT}(src, offset)
         for (first, last, leaf_offset) in vxr
             record_type = get_record_type(src, leaf_offset, FieldSizeT)
             @assert record_type in (VVR_, CVVR_, VXR_)

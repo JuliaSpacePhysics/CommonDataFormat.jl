@@ -22,14 +22,9 @@ struct GDR{FS}
 end
 
 
-"""
-    GDR(buffer::Vector{UInt8}, pos, FieldSizeT)
-
-Load a Global Descriptor Record from the buffer at the specified offset.
-"""
-@inline function GDR(buffer::Vector{UInt8}, offset, FieldSizeT)
-    pos = check_record_type(2, buffer, offset, FieldSizeT)
-    fields, pos = read_be_fields(buffer, pos, GDR{FieldSizeT}, Val(1:9))
+@inline function GDR{FST}(buffer::Vector{UInt8}, offset) where {FST}
+    pos = check_record_type(2, buffer, offset, FST)
+    fields, pos = read_be_fields(buffer, pos, GDR{FST}, Val(1:9))
     return GDR(fields..., pos)
 end
 

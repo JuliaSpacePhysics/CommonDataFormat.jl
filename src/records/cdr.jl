@@ -21,14 +21,8 @@ version(cdr::CDR; verbose = true) = verbose ? (cdr.version, cdr.release, cdr.inc
 majority(cdr::CDR) = (cdr.flags & 0x01) != 0 ? Row : Column  # Row=0, Column=1
 is_cdf_v3(cdr::CDR) = cdr.version == 3
 
-"""
-    CDR(buffer, pos, FieldSizeT)
-
-Load a CDF Descriptor Record from the IO stream at the specified offset.
-This follows the CDF specification for CDR record structure.
-"""
-@inline function CDR(buffer::Vector{UInt8}, offset, ::Type{FieldSizeT}) where {FieldSizeT}
-    pos = check_record_type(1, buffer, offset, FieldSizeT)
-    fields, pos = read_be_fields(buffer, pos, CDR{FieldSizeT}, Val(1:9))
+@inline function CDR{FST}(buffer::Vector{UInt8}, offset) where {FST}
+    pos = check_record_type(1, buffer, offset, FST)
+    fields, pos = read_be_fields(buffer, pos, CDR{FST}, Val(1:9))
     return CDR(fields...)
 end
