@@ -79,18 +79,8 @@ function readname(buf::Vector{UInt8}, offset::Int)
     return @views buf[offset:(offset + 255)]
 end
 
-"""
-    is_cdf_v3(magic_bytes)
-
-Determine if this is a CDF v3 file based on the magic number.
-"""
 is_cdf_v3(magic_bytes) = magic_bytes == 0xCDF30001
 
-"""
-    is_big_endian_encoding(encoding)
-
-Determine if a CDF encoding uses big-endian byte order based on CDF specification encoding values.
-"""
 function is_big_endian_encoding(encoding)
     # Big-endian encodings: network(1), SUN(2), NeXT(12), PPC(9), SGi(5), IBMRS(7), ARM_BIG(19)
     return encoding in (1, 2, 5, 7, 9, 12, 19)
@@ -104,7 +94,3 @@ end
 
 _byte_swap!(data) = map!(ntoh, data, data)
 _byte_swap!(data::AbstractArray{<:StaticString{N}}) where {N} = data
-# function _byte_swap!(data::AbstractArray{TT2000})
-#     rd = reinterpret(Int64, data)
-#     return map!(ntoh, rd, rd)
-# end
