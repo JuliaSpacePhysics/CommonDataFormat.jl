@@ -35,25 +35,39 @@ end
     return ntuple(j -> read_be(v, i + (j - 1) * S, T), n), i + n * S
 end
 
-# Optimized version using loop unrolling
-@generated function read_be_fields(buffer::Vector{UInt8}, pos::Integer, ::Type{SType}, ::Val{indxs}) where {SType, indxs}
-    exprs = Expr[]
-    value_syms = [gensym(:field) for _ in 1:length(indxs)]
-    pos_sym = gensym(:pos)
-
-    push!(exprs, :(local $pos_sym = pos))
-
-    for (i, idx) in enumerate(indxs)
-        T = fieldtype(SType, idx)
-        push!(exprs, :(local $(value_syms[i]) = read_be(buffer, $pos_sym, $T)))
-        push!(exprs, :($pos_sym += _sizeof($T)))
+function field_layout(SType, indxs)
+    offsets = Int[]
+    types = Any[]
+    pos = 0
+    for idx in indxs
+        push!(offsets, pos)
+        push!(types, fieldtype(SType, idx))
+        pos += _sizeof(types[end])
     end
-
-    tuple_expr = Expr(:tuple, value_syms...)
-    push!(exprs, :(($tuple_expr, $pos_sym)))
-
-    return Expr(:block, exprs...)
+    return offsets, types, pos
 end
+
+@generated function read_be_fields(buffer::Vector{UInt8}, pos::Integer, ::Type{SType}, ::Val{indxs}) where {SType, indxs}
+    offsets, types, total = field_layout(SType, indxs)
+    values = [:(read_be(buffer, pos + $(offsets[i]), $(types[i]))) for i in eachindex(offsets)]
+    return :(($(Expr(:tuple, values...)), pos + $total))
+end
+
+@generated function write_be_fields(buffer::Vector{UInt8}, pos::Integer, ::Type{SType}, ::Val{indxs}, values::Tuple) where {SType, indxs}
+    offsets, types, total = field_layout(SType, indxs)
+    exprs = [
+        :(write_be(buffer, pos + $(offsets[i]), convert($(types[i]), values[$i])))
+            for i in eachindex(offsets)
+    ]
+    return Expr(:block, exprs..., :(pos + $total))
+end
+
+@inline function write_be(v::Vector{UInt8}, i, x)
+    GC.@preserve v unsafe_store!(convert(Ptr{typeof(x)}, pointer(v, i)), hton(x))
+    return i + sizeof(x)
+end
+
+@inline write_be(v::Vector{UInt8}, i, ::RInt32) = i + _sizeof(RInt32)
 
 function flatten_field_types(mod, args)
     types = Any[]

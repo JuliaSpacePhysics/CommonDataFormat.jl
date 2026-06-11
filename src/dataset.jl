@@ -74,7 +74,7 @@ function _vdr_at(cdf::CDFDataset{FST}, offset::Int) where {FST}
     record_type = read_be(buffer, offset + 1 + sizeof(FST), Int32)
     @assert record_type in (8, 3)
     return record_type == 8 ? VDR{FST}(buffer, offset) :
-        rVDR{FST}(buffer, offset, GDR(cdf))
+        rVDR{FST}(buffer, offset)
 end
 
 function find_vdr(cdf::CDFDataset, var_name::String)
