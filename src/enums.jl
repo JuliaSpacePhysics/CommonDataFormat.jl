@@ -45,24 +45,18 @@ Base.:(==)(x::T, y::RecordType) where {T <: Integer} = x == T(y)
 Base.:(==)(x::DataType, y::T) where {T <: Integer} = T(x) == y
 Base.:(==)(x::T, y::DataType) where {T <: Integer} = x == T(y)
 
-const type_map = Dict(
-    CDF_INT1 => Int8,
-    CDF_INT2 => Int16,
-    CDF_INT4 => Int32,
-    CDF_INT8 => Int64,
-    CDF_UINT1 => UInt8,
-    CDF_UINT2 => UInt16,
-    CDF_UINT4 => UInt32,
-    CDF_REAL4 => Float32,
-    CDF_REAL8 => Float64,
-    CDF_BYTE => Int8,
-    CDF_FLOAT => Float32,
-    CDF_DOUBLE => Float64,
+# code → eltype for fixed-size types ordered roughly by frequency
+const CODE_TYPE_PAIRS = (
+    (21, Float32), (22, Float64), (44, Float32), (45, Float64),
+    (33, TT2000), (31, Epoch), (32, Epoch16),
+    (1, Int8), (2, Int16), (4, Int32), (8, Int64),
+    (11, UInt8), (12, UInt16), (14, UInt32), (41, Int8),
+)
+
+const type_map = Dict{DataType, Type}(
+    Dict(DataType(c) => T for (c, T) in CODE_TYPE_PAIRS)...,
     CDF_CHAR => UInt8,
     CDF_UCHAR => UInt8,
-    CDF_EPOCH => Epoch,
-    CDF_EPOCH16 => Epoch16,
-    CDF_TIME_TT2000 => TT2000
 )
 
 function julia_type(cdf_type, num_elems)

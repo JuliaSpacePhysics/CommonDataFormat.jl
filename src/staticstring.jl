@@ -1,6 +1,5 @@
 # https://github.com/mkitti/StaticStrings.jl
 # https://github.com/JuliaPy/PythonCall.jl/blob/main/src/Utils/Utils.jl
-using Base: between
 
 struct StaticString{N, T} <: AbstractString
     codeunits::NTuple{N, T}
@@ -8,12 +7,10 @@ struct StaticString{N, T} <: AbstractString
 end
 
 function Base.iterate(x::StaticString{N, UInt8}, i::Int = 1) where {N}
-    i > N && return
+    i > ncodeunits(x) && return
     cs = x.codeunits
     c = @inbounds cs[i]
-    if all(iszero, (cs[j] for j in i:N))
-        return
-    elseif (c & 0x80) == 0x00
+    if (c & 0x80) == 0x00
         return (reinterpret(Char, UInt32(c) << 24), i + 1)
     elseif (c & 0x40) == 0x00
         nothing
@@ -56,12 +53,25 @@ function Base.iterate(x::StaticString{N, UInt8}, i::Int = 1) where {N}
     throw(StringIndexError(x, i))
 end
 
-function Base.String(x::StaticString{N, T}) where {N, T}
-    b = Base.StringVector(N)
-    return String(b .= x.codeunits)
+function Base.String(x::StaticString)
+    n = ncodeunits(x)
+    b = Base.StringVector(n)
+    @inbounds for i in 1:n
+        b[i] = x.codeunits[i]
+    end
+    return String(b)
 end
 
-@inline Base.ncodeunits(::StaticString{N}) where {N} = N
+# CDF CHAR values are fixed-width null-padded; the string ends at the trailing-null run
+# so length/collect/String agree with iterate truncating there.
+@inline function Base.ncodeunits(s::StaticString{N}) where {N}
+    cs = s.codeunits
+    n = N
+    while n > 0 && iszero(@inbounds cs[n])
+        n -= 1
+    end
+    return n
+end
 Base.codeunit(::StaticString{N, T}) where {N, T} = T
 Base.@propagate_inbounds Base.codeunit(s::StaticString, i::Int) = s.codeunits[i]
 
@@ -71,23 +81,4 @@ function StaticString(cu::Base.CodeUnits{T}) where {T}
 end
 StaticString(s::AbstractString) = StaticString(codeunits(s))
 
-Base.isvalid(s::StaticString, i::Int) = checkbounds(Bool, s, i) && thisind(s, i) == i
-Base.thisind(s::StaticString, i::Int) = _thisind_str(s, i)
-
-@inline function _thisind_str(s, i::Int)
-    i == 0 && return 0
-    n = ncodeunits(s)
-    i == n + 1 && return i
-    @boundscheck between(i, 1, n) || throw(BoundsError(s, i))
-    @inbounds b = codeunit(s, i)
-    (b & 0xc0 == 0x80) & (i - 1 > 0) || return i
-    @inbounds b = codeunit(s, i - 1)
-    between(b, 0b11000000, 0b11110111) && return i - 1
-    (b & 0xc0 == 0x80) & (i - 2 > 0) || return i
-    @inbounds b = codeunit(s, i - 2)
-    between(b, 0b11100000, 0b11110111) && return i - 2
-    (b & 0xc0 == 0x80) & (i - 3 > 0) || return i
-    @inbounds b = codeunit(s, i - 3)
-    between(b, 0b11110000, 0b11110111) && return i - 3
-    return i
-end
+Base.isvalid(s::StaticString, i::Int) = checkbounds(Bool, s, i) && Base._thisind_str(s, i) == i

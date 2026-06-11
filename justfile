@@ -8,10 +8,3 @@ perf:
     @time var2 = ds["elb_pef_hs_epa_spec"]
     @time Array(var2)
     @time Array(ds["elb_pef_fs_time"])
-
-snoop:
-    #!/usr/bin/env -S julia --threads=auto --project=. -i
-    using SnoopCompileCore
-    invs = @snoop_invalidations using CommonDataFormat
-    using SnoopCompile, AbstractTrees
-    trees = invalidation_trees(invs)
