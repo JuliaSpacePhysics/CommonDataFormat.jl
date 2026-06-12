@@ -67,8 +67,8 @@ end
     @test ds.compression == CDF.NoCompression
     @test first(ds) == ds["var"]
     @test occursin("Version: 3.9.0", string(ds))
-    display(ds)
-    display(ds["var"])
+    @test occursin("CDFDataset", sprint(show, MIME("text/plain"), ds))
+    @test occursin("attributes: ", sprint(show, MIME("text/plain"), ds["var"]))
 end
 
 @testset "read! typed entry point" begin
