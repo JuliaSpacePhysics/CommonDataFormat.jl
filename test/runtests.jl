@@ -22,7 +22,7 @@ const RUN_JET_TESTS = isempty(VERSION.prerelease)
 
 @testset "JET" begin
     if RUN_JET_TESTS
-        using Pkg; Pkg.add("JET"); Pkg.instantiate()
+        using Pkg; Pkg.add("JET"); Pkg.instantiate(; io = devnull)
         using JET
         JET.test_package(CommonDataFormat; target_modules = [CommonDataFormat])
     end
