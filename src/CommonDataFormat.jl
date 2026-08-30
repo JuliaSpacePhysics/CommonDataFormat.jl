@@ -5,7 +5,6 @@ using Mmap
 using DiskArrays
 using Base.Threads
 using LibDeflate
-using LibDeflate: GzipDecompressResult
 using PrecompileTools
 
 export CDFDataset, CDFVariable

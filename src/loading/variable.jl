@@ -1,21 +1,8 @@
-@static if isdefined(Base, :OncePerProcess)
-    const decompressors = Base.OncePerProcess{Channel{Decompressor}}() do
-        n_ch = nthreads()
-        chnl = Channel{Decompressor}(n_ch)
-        foreach(i -> put!(chnl, Decompressor()), 1:n_ch)
-        return chnl
-    end
-else
-    const _decompressors = Ref{Union{Channel{Decompressor}, Nothing}}(nothing)
-    function decompressors()
-        if _decompressors[] === nothing
-            n_ch = nthreads()
-            chnl = Channel{Decompressor}(n_ch)
-            foreach(i -> put!(chnl, Decompressor()), 1:n_ch)
-            _decompressors[] = chnl
-        end
-        return _decompressors[]
-    end
+const decompressors = Base.OncePerProcess{Channel{Decompressor}}() do
+    n_ch = nthreads()
+    chnl = Channel{Decompressor}(n_ch)
+    foreach(i -> put!(chnl, Decompressor()), 1:n_ch)
+    return chnl
 end
 
 """
