@@ -71,30 +71,6 @@ end
 @inline _construct(cdf, name, vdr, dims::NTuple{N, Int}, ::Type{T}) where {N, T} =
     CDFVariable{T, N, typeof(vdr), typeof(cdf)}(name, vdr, cdf, dims)
 
-"""
-    read!(ds::CDFDataset, name, dest::AbstractArray{T, N}) -> dest
-
-Read the full contents of variable `name` into the preallocated `dest`.
-"""
-function Base.read!(ds::CDFDataset, name::String, dest::AbstractArray{T, N}) where {T, N}
-    vdr = find_vdr(ds, name)
-    isnothing(vdr) && throw(KeyError(name))
-    return _read_full!(dest, ds, name, vdr)
-end
-
-"""
-    read(ds::CDFDataset, name, ::Type{Array{T, N}}) -> Array{T, N}
-
-Allocating variant of [`read!`](@ref): read the full contents of variable `name` into a
-freshly allocated `Array{T, N}`.
-"""
-function Base.read(ds::CDFDataset, name::String, ::Type{Array{T, N}}) where {T, N}
-    vdr = find_vdr(ds, name)
-    isnothing(vdr) && throw(KeyError(name))
-    dims = (map(Int, record_sizes(vdr, ds, Val(N - 1)))..., Int(vdr.max_rec) + 1)
-    return _read_full!(Array{T, N}(undef, dims), ds, name, vdr)
-end
-
 function _read_full!(dest::AbstractArray{T, N}, ds, name, vdr) where {T, N}
     Base.require_one_based_indexing(dest)
     Tfile = julia_type(vdr.data_type, vdr.num_elems)

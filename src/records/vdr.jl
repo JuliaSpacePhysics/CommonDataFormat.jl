@@ -74,9 +74,6 @@ Load an r-Variable Descriptor Record from the buffer at the specified offset.
     return rVDR{FieldSizeT}(fields..., pos)
 end
 
-
-# Static-arity variants for the typed `read!` path: the caller supplies the dimension
-# count via `Val`, so tuple lengths stay inferable under `juliac --trim`.
 function record_sizes(vdr::VDR, cdf, ::Val{M}) where {M}
     vdr.num_dims == M ||
         throw(DimensionMismatch("variable has $(vdr.num_dims) dimensions, expected $M"))
