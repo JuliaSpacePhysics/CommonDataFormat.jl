@@ -1,5 +1,4 @@
 include("decompress/rle.jl")
-include("decompress/gzip.jl")
 
 
 function decompress_bytes(buffer, ::Type{RecordSizeType}) where {RecordSizeType}
@@ -25,12 +24,11 @@ function decompress_bytes(data, compression::CompressionType; expected_bytes::Un
     compression in (GzipCompression, RLECompression) ||
         throw(ArgumentError("unsupported compression: $compression"))
     result = if compression == GzipCompression
-        decompressor = Decompressor()
         input = convert(Vector{UInt8}, data)
-        max_size = isnothing(expected_bytes) ? length(input) * 10 : expected_bytes
-        output = Vector{UInt8}(undef, max_size)
-        decomp_result = gzip_decompress!(decompressor, output, input)
-        resize!(output, decomp_result.len)
+        output = UInt8[]
+        # Sizes `output` from the member's ISIZE trailer, so no output-size guess is needed.
+        out = gzip_isize_decompress!(Decompressor(), output, input, GzipExtraField[])
+        out isa LibDeflateError && throw(ArgumentError("gzip decompression failed: $out"))
         output
     else
         isnothing(expected_bytes) && throw(ArgumentError("RLE decompression requires expected size"))
@@ -47,9 +45,16 @@ function decompress_bytes!(decompressor, dest, doffs, src::AbstractVector{UInt8}
         _copy_to!(dest, doffs, src, soffs, N)
     elseif compression == GzipCompression
         n_out = N * sizeof(eltype(dest))
+        fields = GzipExtraField[]
         GC.@preserve dest src begin
-            out = _unsafe_gzip_decompress!(decompressor, pointer(dest, doffs), n_out, pointer(src, soffs), n_in)
-            out isa LibDeflateError && throw(ArgumentError("gzip decompression failed"))
+            out = unsafe_gzip_decompress!(
+                decompressor,
+                WriteableMemory(pointer(dest, doffs), n_out),
+                ReadableMemory(pointer(src, soffs), n_in),
+                UInt(n_out),
+                fields,
+            )
+            out isa LibDeflateError && throw(ArgumentError("gzip decompression failed: $out"))
         end
     elseif compression == RLECompression
         n_out = N * sizeof(eltype(dest))
