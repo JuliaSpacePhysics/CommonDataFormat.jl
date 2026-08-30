@@ -4,7 +4,9 @@ import CommonDataFormat as CDF
 
 include("utils.jl")
 include("epochs_test.jl")
-include("comprehensive_test.jl")
+@testset "Comprehensive Test" begin
+    include("comprehensive_test.jl")
+end
 include("cdf2_test.jl")
 include("CommonDataModelExt_test.jl")
 include("decompress_test.jl")
@@ -30,6 +32,26 @@ end
 
 @testset "Trim" begin
     include("trim.jl")
+end
+
+# Reference the type-erased block kernels against permutedims/view on random shapes.
+@testset "block copy kernels" begin
+    for esz in (1, 4, 8, 9), k in 1:4
+        rdims = rand(1:5, k)
+        nrec = rand(1:4)
+        raw = rand(UInt8, prod(rdims) * esz * nrec)
+        stored = reshape(raw, esz, reverse(rdims)..., nrec)
+        expected = permutedims(stored, (1, (k + 1):-1:2..., k + 2))
+        swapped = copy(raw)
+        GC.@preserve swapped CDF._majority_swap!(pointer(swapped), esz, rdims, nrec)
+        @test swapped == vec(expected)
+
+        ranges = [let a = rand(1:d); a:rand(a:d) end for d in rdims]
+        src = reshape(raw, esz, rdims..., nrec)
+        dst = Vector{UInt8}(undef, esz * prod(length, ranges) * nrec)
+        GC.@preserve dst raw CDF._copy_subblock!(pointer(dst), pointer(raw), esz, rdims, ranges, nrec)
+        @test dst == vec(src[:, ranges..., :])
+    end
 end
 
 @testset "Fill Value" begin

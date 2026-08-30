@@ -1,18 +1,3 @@
-"""
-Variable Value Record (VVR) - contains actual variable data
-"""
-struct VVR{T}
-    header::Header
-    data::Vector{T}     # Raw variable data
-end
-
-@inline function VVR(buffer::Vector{UInt8}, offset, ::Type{RecordSizeType}, data) where {RecordSizeType}
-    pos = offset + 1
-    header = Header(buffer, pos, RecordSizeType)
-    @assert header.record_type == 7 "Invalid VVR record type"
-    return VVR(header, data)
-end
-
 function _copy_to!(dest, doffs, src, soffs, N)
     T = eltype(dest)
     GC.@preserve dest src begin

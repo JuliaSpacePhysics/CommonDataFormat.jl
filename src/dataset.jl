@@ -145,7 +145,7 @@ function Base.show(io::IO, m::MIME"text/plain", cdf::CDFDataset)
         print(io, "  ", var.name, " : ", size(var), " ")
         printstyled(io, variable_type(var); bold = true)
         print(io, " ", CDFDataType(var.vdr.data_type))
-        !isempty(var) && print(io, " [", var[1], " … ", var[end], "]")
+        !isempty(var) && print(io, " [", first(_record(var, 1)), " … ", last(_record(var, size(var)[end])), "]")
         println(io)
     end
     println(io, cdf.cdr)
