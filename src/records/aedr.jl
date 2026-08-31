@@ -27,11 +27,10 @@ function load_aedr_data(buffer::Vector{UInt8}, offset, ::Type{RecordSizeType}, n
     _data_offset = 41 + 2 * sizeof(RecordSizeType)
     datatype = read_be(buffer, offset + _datatype_offset, Int32)
     NumElems = read_be(buffer, offset + _numelems_offset, Int32)
-    T = julia_type(datatype, NumElems)
     return if datatype in (CDF_CHAR, CDF_UCHAR)
         load_char_data(buffer, offset + _data_offset, NumElems)
     else
-        load_attribute_data(T, buffer, offset + _data_offset, NumElems, needs_byte_swap)
+        load_attribute_data(julia_type(datatype), buffer, offset + _data_offset, NumElems, needs_byte_swap)
     end
 end
 

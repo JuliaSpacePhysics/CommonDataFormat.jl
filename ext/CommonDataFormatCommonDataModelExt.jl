@@ -15,10 +15,7 @@ const SymbolOrString = Union{Symbol, AbstractString}
 CDM.path(ds::CDFDataset) = CDF.filename(ds)
 CDM.varnames(ds::CDFDataset) = keys(ds)
 
-function CDM.variable(ds::CDFDataset, name::SymbolOrString)
-    return CDF.variable(ds, String(name))
-end
-
+CDM.variable(ds::CDFDataset, name::SymbolOrString) = ds[String(name)]
 CDM.attribnames(ds::CDFDataset) = CDF.attribnames(ds)
 CDM.attrib(ds::CDFDataset, args...) = CDF.attrib(ds, args...)
 
@@ -31,15 +28,8 @@ CDM.attrib(var::CDFVariable, args...) = CDF.attrib(var, args...)
 function CDM.dimnames(var::CDFVariable, i)
     N = ndims(var)
     @assert i <= N
-    key = if i == N
-        "DEPEND_0"
-    elseif i == 1
-        "DEPEND_1"
-    elseif i == 2
-        "DEPEND_2"
-    else
-        "DEPEND_$i"
-    end
+    # The record dimension is last in Julia but is DEPEND_0 in the ISTP conventions.
+    key = i == N ? "DEPEND_0" : "DEPEND_$i"
     return CDF.attrib(var, key)::Union{String, Nothing}
 end
 

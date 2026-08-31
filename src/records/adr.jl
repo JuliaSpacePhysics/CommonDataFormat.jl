@@ -20,8 +20,8 @@ struct ADR{FSZ, S} <: Record
 end
 
 is_global(adr) = adr.Scope == 1
-is_global(buffer, offset, ::Type{Int32}) = read_be(buffer, offset + 17, Int32) == 1
-is_global(buffer, offset, ::Type{Int64}) = read_be(buffer, offset + 29, Int32) == 1
+# Scope, read without parsing the rest of the ADR: header + ADRnext + AgrEDRhead
+is_global(buffer, offset, ::Type{FST}) where {FST} = read_be(buffer, offset + 3 * sizeof(FST) + 5, Int32) == 1
 
 
 @inline function ADR{FST}(buffer::Vector{UInt8}, offset) where {FST}

@@ -77,44 +77,63 @@ function _vdr_at(cdf::CDFDataset{FST}, offset::Int) where {FST}
         rVDR{FST}(buffer, offset)
 end
 
-function find_vdr(cdf::CDFDataset, var_name::String)
-    gdr = GDR(cdf)
-    RecordSizeType = recordsize_type(cdf)
-    buffer = cdf.buffer
+# Name is the first variable-width field of a VDR; everything before it is fixed size.
+vdr_name(buffer, offset, ::Type{FST}) where {FST} = readname(buffer, offset + 45 + 5 * sizeof(FST))
+# r-variables are chained first, then z-variables
+vdr_heads(cdf::CDFDataset) = (GDR(cdf).rVDRhead, GDR(cdf).zVDRhead)
+
+function find_vdr(cdf::CDFDataset{FST}, var_name::String) where {FST}
+    buffer = parent(cdf)
     var_name_bytes = codeunits(var_name)
-    vdr_name_offset = 45 + 5 * sizeof(RecordSizeType)
-    for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
-        while current_offset != 0
-            if readname(buffer, current_offset + vdr_name_offset) == var_name_bytes
-                return _vdr_at(cdf, Int(current_offset))
-            end
-            current_offset = read_be(buffer, current_offset + 5 + sizeof(RecordSizeType), RecordSizeType)
-        end
+    for head in vdr_heads(cdf), offset in OffsetsIterator{FST}(buffer, head)
+        vdr_name(buffer, offset, FST) == var_name_bytes && return _vdr_at(cdf, offset)
     end
     return nothing
 end
 
-# Direct variable access via indexing
-function Base.getindex(cdf::CDFDataset, var_name::String)
-    return variable(cdf, var_name)
+function Base.getindex(cdf::CDFDataset, name::String)
+    vdr = find_vdr(cdf, name)
+    isnothing(vdr) && throw(KeyError(name))
+    return _variable(cdf, name, vdr)
 end
+
+# Branch over dimension count so each leaf builds dims tuple at compile time statically
+function _variable(cdf, name, vdr)
+    M = num_record_dims(vdr, cdf)
+    return Base.Cartesian.@nif 12 d -> (M == d - 1) d -> (
+        d == 12 ? throw(ArgumentError("variable has $M dimensions; the CDF format allows at most 10")) :
+        _variable(cdf, name, vdr, Val(d - 1))
+    )
+end
+
+function _variable(cdf, name, vdr, ::Val{M}) where {M}
+    dims = (map(Int, record_sizes(vdr, cdf, Val(M)))..., Int(vdr.max_rec) + 1)
+    code = Int(vdr.data_type)
+    if code == CDF_CHAR || code == CDF_UCHAR # eltype depends on runtime num_elems
+        T = StaticString{Int(vdr.num_elems),UInt8}
+        return CDFVariable{T,M + 1,typeof(vdr),typeof(cdf)}(name, vdr, cdf, dims)
+    end
+    # Branch to static constructor per element type
+    return Base.Cartesian.@nif(
+        16,
+        d -> code == CODE_TYPE_PAIRS[d][1],
+        d -> _construct(cdf, name, vdr, dims, CODE_TYPE_PAIRS[d][2]),
+        d -> throw(ArgumentError("unsupported CDF data type $code"))
+    )
+end
+
+@inline _construct(cdf, name, vdr, dims::NTuple{N,Int}, ::Type{T}) where {N,T} =
+    CDFVariable{T,N,typeof(vdr),typeof(cdf)}(name, vdr, cdf, dims)
 
 Base.length(cdf::CDFDataset) = Int(GDR(cdf).NrVars + GDR(cdf).NzVars)
 
-function Base.keys(cdf::CDFDataset)
-    RecordSizeType = recordsize_type(cdf)
-    gdr = cdf.gdr
-    source = parent(cdf)
-    varnames = Vector{String}(undef, gdr.NrVars + gdr.NzVars)
+function Base.keys(cdf::CDFDataset{FST}) where {FST}
+    buffer = parent(cdf)
+    varnames = Vector{String}(undef, length(cdf))
     i = 1
-    vdr_name_offset = 45 + 5 * sizeof(RecordSizeType)
-    for current_offset in (gdr.rVDRhead, gdr.zVDRhead)
-        while current_offset != 0
-            vdr_next = read_be(source, current_offset + 5 + sizeof(RecordSizeType), RecordSizeType)
-            varnames[i] = String(readname(source, current_offset + vdr_name_offset))
-            i += 1
-            current_offset = vdr_next
-        end
+    for head in vdr_heads(cdf), offset in OffsetsIterator{FST}(buffer, head)
+        varnames[i] = String(vdr_name(buffer, offset, FST))
+        i += 1
     end
     return varnames
 end
@@ -122,19 +141,16 @@ end
 Base.haskey(cdf::CDFDataset, var_name::String) = !isnothing(find_vdr(cdf, var_name))
 
 # Walk the rVDR then zVDR chain directly; state = (offset, still_in_r_chain)
-function Base.iterate(cdf::CDFDataset, state = (Int(GDR(cdf).rVDRhead), true))
+function Base.iterate(cdf::CDFDataset{FST}, state = (Int(GDR(cdf).rVDRhead), true)) where {FST}
     offset, in_rchain = state
     if offset == 0
         in_rchain || return nothing
         offset, in_rchain = Int(GDR(cdf).zVDRhead), false
         offset == 0 && return nothing
     end
-    RecordSizeType = recordsize_type(cdf)
     buffer = parent(cdf)
-    name = String(readname(buffer, offset + 45 + 5 * sizeof(RecordSizeType)))
-    var = _variable(cdf, name, _vdr_at(cdf, offset))
-    next_offset = Int(read_be(buffer, offset + 5 + sizeof(RecordSizeType), RecordSizeType))
-    return (var, (next_offset, in_rchain))
+    var = _variable(cdf, String(vdr_name(buffer, offset, FST)), _vdr_at(cdf, offset))
+    return (var, (next_record_offset(buffer, offset, FST), in_rchain))
 end
 
 function Base.show(io::IO, m::MIME"text/plain", cdf::CDFDataset)
