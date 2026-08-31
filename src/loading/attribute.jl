@@ -59,7 +59,7 @@ function Base.iterate(la::LazyVAttrib, offset::Int = Int(la.cdf.gdr.ADRhead))
     while offset != 0
         # cheap scope check before parsing the full ADR (avoids Name string allocation for globals)
         if is_global(buffer, offset, RecordSizeType)
-            offset = Int(read_be(buffer, offset + 1 + sizeof(RecordSizeType) + 4, RecordSizeType))
+            offset = next_record_offset(buffer, offset, RecordSizeType)
             continue
         end
         adr = ADR{RecordSizeType}(buffer, offset)
@@ -125,13 +125,12 @@ end
     aedr_head == 0 && return nothing
     offset = Int(aedr_head)
     _num_offset = 13 + 2 * sizeof(RecordSizeType)
-    _next_offset = 5 + sizeof(RecordSizeType)
     while offset != 0
         num = read_be(source, offset + _num_offset, Int32)
         if num == target_varnum
             return load_aedr_data(source, offset, RecordSizeType, needs_byte_swap)
         end
-        offset = Int(read_be(source, offset + _next_offset, RecordSizeType))
+        offset = next_record_offset(source, offset, RecordSizeType)
     end
     return nothing
 end

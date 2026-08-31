@@ -9,32 +9,27 @@ function decompress_bytes(buffer, ::Type{RecordSizeType}) where {RecordSizeType}
     payload = data_view(ccr, buffer)
     expected = Int(ccr.uncompressed_size)
     decompressed = decompress_bytes(payload, compression; expected_bytes = expected)
-    new_size = 8 + length(decompressed)
-    new_buffer = Vector{UInt8}(undef, new_size)
+    new_buffer = Vector{UInt8}(undef, 8 + length(decompressed))
     copyto!(new_buffer, 1, buffer, 1, 4)
-    new_buffer[5] = 0x00
-    new_buffer[6] = 0x00
-    new_buffer[7] = 0xFF
-    new_buffer[8] = 0xFF
+    write_be(new_buffer, 5, 0x0000FFFF)  # the uncompressed marker replaces the CCR magic
     copyto!(new_buffer, 9, decompressed, 1, length(decompressed))
     return new_buffer, compression
 end
 
 function decompress_bytes(data, compression::CompressionType; expected_bytes::Union{Nothing, Int} = nothing)
     compression == NoCompression && return data
-    compression in (GzipCompression, RLECompression) ||
-        throw(ArgumentError("unsupported compression: $compression"))
     result = if compression == GzipCompression
-        decompressor = Decompressor()
         input = convert(Vector{UInt8}, data)
         max_size = isnothing(expected_bytes) ? length(input) * 10 : expected_bytes
         output = Vector{UInt8}(undef, max_size)
-        decomp_result = gzip_decompress!(decompressor, output, input)
+        decomp_result = gzip_decompress!(Decompressor(), output, input)
         resize!(output, decomp_result.len)
         output
-    else
+    elseif compression == RLECompression
         isnothing(expected_bytes) && throw(ArgumentError("RLE decompression requires expected size"))
         _rle_decompress(data, expected_bytes)
+    else
+        throw(ArgumentError("unsupported compression: $compression"))
     end
     if !isnothing(expected_bytes) && length(result) != expected_bytes
         throw(ArgumentError("Decompressed payload size mismatch (expected $(expected_bytes), got $(length(result)))"))

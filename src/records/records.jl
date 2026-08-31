@@ -3,33 +3,16 @@
 # [CDF Internal Format Description](https://spdf.gsfc.nasa.gov/pub/software/cdf/doc/cdfifd.pdf)
 Base.iterate(r::Record, i = 1) = i > fieldcount(typeof(r)) ? nothing : (getfield(r, i), i + 1)
 
-"""
-CDF Record header structure - common to all record types
-"""
-struct Header
-    record_size::Int64  # Can be Int32 for v2, Int64 for v3
-    record_type::Int32
-end
-
-@inline function Header(buf::Vector{UInt8}, pos, ::Type{FieldSizeT}) where {FieldSizeT}
-    record_size = Int64(read_be(buf, pos, FieldSizeT))
-    record_type = read_be(buf, pos + sizeof(FieldSizeT), Int32)
-    return Header(record_size, record_type)
-end
-
+# Every record starts with its size (FieldSizeT) then its type (Int32). The ADR, AEDR and
+# VDR chains all store the next record's offset in the field right after that header.
+record_size(buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT} = Int(read_be(buffer, offset + 1, FieldSizeT))
 get_record_type(buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT} = read_be(buffer, offset + sizeof(FieldSizeT) + 1, Int32)
+next_record_offset(buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT} = Int(read_be(buffer, offset + sizeof(FieldSizeT) + 5, FieldSizeT))
 
 @inline function check_record_type(record_type::Integer, buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT}
     pos = offset + sizeof(FieldSizeT) + 1
     header_type = read_be(buffer, pos, Int32)
     @assert header_type == record_type
-    return pos + sizeof(Int32)
-end
-
-@inline function check_record_type(record_types, buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT}
-    pos = offset + sizeof(FieldSizeT) + 1
-    header_type = read_be(buffer, pos, Int32)
-    @assert header_type in record_types
     return pos + sizeof(Int32)
 end
 

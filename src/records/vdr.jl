@@ -47,6 +47,9 @@ struct VDR{FST} <: AbstractVDR{FST}
     # dim_varys::Tuple{Vararg{Int32}}    # Dimension variance flags
 end
 
+# zNumDims (zVDRs) / DimVarys (rVDRs) start right after the fixed-width name field.
+_after_name(offset, ::Type{FieldSizeT}) where {FieldSizeT} = FieldSizeT == Int64 ? offset + 341 : offset + 129
+
 """
     VDR{FieldSizeT}(buffer, offset)
 
@@ -54,11 +57,8 @@ Load a z-Variable Descriptor Record from the buffer at the specified offset.
 """
 @inline function VDR{FieldSizeT}(buffer::Vector{UInt8}, offset) where {FieldSizeT}
     pos = check_record_type(8, buffer, offset, FieldSizeT)
-    fields, pos = read_be_fields(buffer, pos, VDR{FieldSizeT}, Val(1:13))
-    # name = readname(buffer, pos)
-
-    pos = FieldSizeT == Int64 ? offset + 340 + 1 : offset + 128 + 1
-    z_num_dims, pos = read_be_i(buffer, pos, Int32)
+    fields, _ = read_be_fields(buffer, pos, VDR{FieldSizeT}, Val(1:13))
+    z_num_dims, pos = read_be_i(buffer, _after_name(offset, FieldSizeT), Int32)
     return VDR{FieldSizeT}(fields..., z_num_dims, pos)
 end
 
@@ -69,9 +69,8 @@ Load an r-Variable Descriptor Record from the buffer at the specified offset.
 """
 @inline function rVDR{FieldSizeT}(buffer::Vector{UInt8}, offset) where {FieldSizeT}
     pos = check_record_type(3, buffer, offset, FieldSizeT)
-    fields, pos = read_be_fields(buffer, pos, rVDR{FieldSizeT}, Val(1:13))
-    pos = FieldSizeT == Int64 ? offset + 340 + 1 : offset + 128 + 1
-    return rVDR{FieldSizeT}(fields..., pos)
+    fields, _ = read_be_fields(buffer, pos, rVDR{FieldSizeT}, Val(1:13))
+    return rVDR{FieldSizeT}(fields..., _after_name(offset, FieldSizeT))
 end
 
 function record_sizes(vdr::VDR, cdf, ::Val{M}) where {M}

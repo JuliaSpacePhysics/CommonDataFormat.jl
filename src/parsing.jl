@@ -16,11 +16,6 @@ end
     return ntoh(unsafe_load(p + (i - 1) * sizeof(T)))
 end
 
-@inline function read_be(v::Vector{UInt8}, i, n, T)
-    S = sizeof(T)
-    return ntuple(j -> read_be(v, i + (j - 1) * S, T), n)
-end
-
 @inline function read_be(v::Vector{UInt8}, i, ::Val{M}, T) where {M}
     S = sizeof(T)
     return ntuple(j -> read_be(v, i + (j - 1) * S, T), Val(M))
@@ -28,11 +23,6 @@ end
 
 @inline function read_be_i(v::Vector{UInt8}, i, T::Base.DataType)
     return read_be(v, i, T), i + _sizeof(T)
-end
-
-@inline function read_be_i(v::Vector{UInt8}, i, n::Integer, T)
-    S = sizeof(T)
-    return ntuple(j -> read_be(v, i + (j - 1) * S, T), n), i + n * S
 end
 
 function field_layout(SType, indxs)
@@ -68,21 +58,6 @@ end
 end
 
 @inline write_be(v::Vector{UInt8}, i, ::RInt32) = i + _sizeof(RInt32)
-
-function flatten_field_types(mod, args)
-    types = Any[]
-    for arg in args
-        if arg isa Expr && arg.head === :...
-            vals = Base.eval(mod, arg.args[1])
-            for T in vals
-                push!(types, Meta.quot(T))
-            end
-        else
-            push!(types, arg)
-        end
-    end
-    return types
-end
 
 function readname(buf::Vector{UInt8}, offset::Int)
     for i in offset:(offset + 255)

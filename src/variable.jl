@@ -56,13 +56,9 @@ end
 
 @inline function Base.getproperty(var::CDFVariable, name::Symbol)
     name in fieldnames(CDFVariable) && return getfield(var, name)
-    if name == :attrib
-        return attrib(var)
-    elseif name == :datatype
-        return CDFDataType(var.vdr.data_type)
-    else
-        throw(ArgumentError("Unknown property $name"))
-    end
+    name === :attrib && return attrib(var)
+    name === :datatype && return CDFDataType(var.vdr.data_type)
+    throw(ArgumentError("Unknown property $name"))
 end
 
 Base.getindex(var::CDFVariable, name::String) = var.attrib[name]
