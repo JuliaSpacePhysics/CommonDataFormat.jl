@@ -82,3 +82,14 @@ end
 StaticString(s::AbstractString) = StaticString(codeunits(s))
 
 Base.isvalid(s::StaticString, i::Int) = checkbounds(Bool, s, i) && Base._thisind_str(s, i) == i
+
+# Specialized display machinery, costing compile time for each distinct CDF CHAR width
+Base.show(io::IO, s::StaticString) = show(io, String(s))
+
+function Base.show(io::IO, ::MIME"text/plain", a::AbstractArray{<:StaticString})
+    summary(io, a)
+    isempty(a) && return
+    print(io, ":\n")
+    Base.print_array(io, map(String, a))
+    return
+end

@@ -33,3 +33,19 @@ end
     @test isvalid(s, 2) && !isvalid(s, 3)
     @test length(s) == 5 && ncodeunits(s) == 6
 end
+
+@testset "show" begin
+    pad = StaticString{8, UInt8}((UInt8('a'), UInt8('b'), zeros(UInt8, 6)...))
+    @test sprint(show, pad) == "\"ab\""              # null padding trimmed, quoted like String
+    @test sprint(show, StaticString("a\"\n")) == sprint(show, "a\"\n")
+
+    disp(x) = sprint(show, MIME"text/plain"(), x)
+    for a in (fill(pad, 3), fill(pad, 2, 2))
+        header, body = split(disp(a), ":\n"; limit = 2)
+        # element rendering delegates to String; only the summary keeps the real eltype
+        @test body == split(disp(map(String, a)), ":\n"; limit = 2)[2]
+        @test occursin("StaticString{8, UInt8}", header)
+    end
+    empty = StaticString{4, UInt8}[]
+    @test disp(empty) == sprint(summary, empty)
+end
