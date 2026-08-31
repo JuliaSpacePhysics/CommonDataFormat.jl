@@ -1,34 +1,25 @@
-abstract type AbstractVariable{T, N} <: DiskArrays.AbstractDiskArray{T, N} end
+abstract type AbstractVariable{T,N} <: DiskArrays.AbstractDiskArray{T,N} end
 
 struct VVREntry
     first::Int
     last::Int
     offset::Int
+    compressed::Bool  # leaf is a CVVR (a compressed variable may still store poorly-compressing blocks as plain VVRs)
 end
 
 Base.length(entry::VVREntry) = entry.last - entry.first + 1
 
-struct CDFVariable{T, N, V, P} <: AbstractVariable{T, N}
+struct CDFVariable{T,N,V,P} <: AbstractVariable{T,N}
     name::String
     vdr::V
     parentdataset::P
-    dims::NTuple{N, Int}
+    dims::NTuple{N,Int}
 end
 
 Base.size(var::CDFVariable) = var.dims
 
 @inline majority(var::CDFVariable) = majority(var.parentdataset)
 @inline is_big_endian_encoding(var::CDFVariable) = is_big_endian_encoding(var.parentdataset)
-
-function dst_src_ranges(first, last, entry)
-    overlap_first = max(first, entry.first)
-    overlap_last = min(last, entry.last)
-    local_first = overlap_first - entry.first + 1
-    local_last = overlap_last - entry.first + 1
-    dest_first = overlap_first - first + 1
-    dest_last = overlap_last - first + 1
-    return (dest_first:dest_last, local_first:local_last)
-end
 
 # Codes seem to be faster if we disable chunking
 DiskArrays.haschunks(::CDFVariable) = DiskArrays.Unchunked()
@@ -46,7 +37,7 @@ function _eachchunk(var::CDFVariable)
 end
 
 function _eachchunk_vvrs(var::CDFVariable)
-    vvrs, _ = read_vvrs(var.vdr, var.parentdataset)
+    vvrs = read_vvrs(var.vdr, var.parentdataset)
     N = ndims(var)
     chunks = ntuple(N) do i
         if i != N
@@ -54,9 +45,9 @@ function _eachchunk_vvrs(var::CDFVariable)
         else
             chunksizes = length.(vvrs)
             if length(vvrs) > 0
-                chunksizes[end] = @views var.dims[N] - sum(chunksizes[1:(end - 1)])
+                chunksizes[end] = @views var.dims[N] - sum(chunksizes[1:(end-1)])
             end
-            DiskArrays.IrregularChunks(chunksizes = chunksizes)
+            DiskArrays.IrregularChunks(chunksizes=chunksizes)
         end
     end
     return DiskArrays.GridChunks(chunks)
@@ -82,6 +73,33 @@ attrib(var::CDFVariable, name::String) = get(attrib(var), name)
 
 is_record_varying(v::CDFVariable) = is_record_varying(v.vdr)
 variable_type(v::CDFVariable) = get(v.attrib, "VAR_TYPE", "unknown")
+
+# Base's summary/showarg specializes on the full type; keep it cheap per element type.
+Base.summary(io::IO, var::CDFVariable{T}) where {T} =
+    print(io, Base.dims2string(size(var)), " CDFVariable{", T, "}")
+
+# DiskArrays' reductions read chunk-by-chunk through its generic indexing,
+# which compiles per shape (~40-260 ms).
+# With Unchunked chunking that already means one full read
+for f in (:sum, :prod, :maximum, :minimum, :extrema, :all, :any, :count)
+    @eval Base.$f(var::CDFVariable; kw...) = Base.$f(Array(var); kw...)
+    @eval Base.$f(g::Function, var::CDFVariable; kw...) = Base.$f(g, Array(var); kw...)
+end
+
+Base.collect(var::CDFVariable) = Array(var)
+
+function Base.iterate(var::CDFVariable)
+    isempty(var) && return nothing
+    A = Array(var)
+    x, st = iterate(A)::Tuple
+    return x, (A, st)
+end
+function Base.iterate(::CDFVariable, state::Tuple{Array,Int})
+    A, st = state
+    r = iterate(A, st)
+    r === nothing && return nothing
+    return r[1], (A, r[2])
+end
 
 function Base.show(io::IO, m::MIME"text/plain", var::CDFVariable)
     summary(io, var)

@@ -106,5 +106,22 @@ function validate_cdf_magic(magic_bytes)
     return magic_bytes in cdf_magic_bytes
 end
 
-_byte_swap!(data) = map!(ntoh, data, data)
-_byte_swap!(data::AbstractArray{<:StaticString{N}}) where {N} = data
+# Big-endian files: swap each `unit`-byte word in place (0 = raw bytes, no swap).
+_swap_unit(::Type{T}) where {T} = sizeof(T)
+_swap_unit(::Type{<:StaticString}) = 0
+_swap_unit(::Type{Epoch16}) = 8  # two Float64s
+function _byte_swap!(p::Ptr{UInt8}, nbytes::Int, unit::Int)
+    unit <= 1 && return
+    unit == 2 && return _swap_words!(Ptr{UInt16}(p), nbytes ÷ 2)
+    unit == 4 && return _swap_words!(Ptr{UInt32}(p), nbytes ÷ 4)
+    unit == 8 && return _swap_words!(Ptr{UInt64}(p), nbytes ÷ 8)
+    throw(ArgumentError("unsupported byte-swap unit $unit"))
+end
+function _swap_words!(p::Ptr{U}, n::Int) where {U}
+    for i in 1:n
+        unsafe_store!(p, ntoh(unsafe_load(p, i)), i)
+    end
+    return
+end
+_byte_swap!(data::Array{T}) where {T} =
+    GC.@preserve data _byte_swap!(Ptr{UInt8}(pointer(data)), sizeof(data), _swap_unit(T))
