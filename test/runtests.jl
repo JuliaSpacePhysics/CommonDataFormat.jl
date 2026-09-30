@@ -20,14 +20,9 @@ end
     Aqua.test_all(CommonDataFormat)
 end
 
-const RUN_JET_TESTS = isempty(VERSION.prerelease)
-
 @testset "JET" begin
-    if RUN_JET_TESTS
-        using Pkg; Pkg.add("JET"; io = devnull); Pkg.instantiate()
-        using JET
-        JET.test_package(CommonDataFormat; target_modules = [CommonDataFormat])
-    end
+    using JET
+    JET.test_package(CommonDataFormat; target_modules = [CommonDataFormat])
 end
 
 @testset "Trim" begin
