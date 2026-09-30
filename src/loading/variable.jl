@@ -135,13 +135,16 @@ end
 
 # Whole-variable reads skip DiskArrays' indexing layer, which is costly to compile
 function Base.Array(var::CDFVariable{T,N}) where {T,N}
-    return DiskArrays.readblock!(var, Array{T,N}(undef, size(var)), axes(var)...)
+    dest = Array{T,N}(undef, size(var))
+    DiskArrays.readblock!(var, dest, axes(var)...)
+    return dest
 end
 
 function _record(var::CDFVariable{T,N}, r::Int) where {T,N}
     rdims = Base.front(var.dims)
     dest = Array{T,N}(undef, rdims..., 1)
-    return DiskArrays.readblock!(var, dest, ntuple(i -> 1:rdims[i], N - 1)..., r:r)
+    DiskArrays.readblock!(var, dest, ntuple(i -> 1:rdims[i], N - 1)..., r:r)
+    return dest
 end
 
 # Fill `dest` (exactly `nrec * record_bytes` bytes) with records `rec_first:rec_last`.
