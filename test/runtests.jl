@@ -1,3 +1,8 @@
+using Pkg
+# prereleases often have no installable JET.
+const RUN_JET_TESTS = isempty(VERSION.prerelease)
+RUN_JET_TESTS && Pkg.add("JET")
+
 using CommonDataFormat
 using Test
 import CommonDataFormat as CDF
@@ -20,12 +25,9 @@ end
     Aqua.test_all(CommonDataFormat)
 end
 
-const RUN_JET_TESTS = isempty(VERSION.prerelease)
-
-@testset "JET" begin
-    if RUN_JET_TESTS
-        using Pkg; Pkg.add("JET"; io = devnull); Pkg.instantiate()
-        using JET
+if RUN_JET_TESTS
+    using JET
+    @testset "JET" begin
         JET.test_package(CommonDataFormat; target_modules = [CommonDataFormat])
     end
 end
