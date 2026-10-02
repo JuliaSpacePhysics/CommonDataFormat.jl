@@ -33,6 +33,24 @@ end
     @test TT2000(0) == DateTime("2000-01-01T11:58:55.816")
 end
 
+@testset "TT2000 leap seconds" begin
+    # values from cdflib.cdfepoch.compute_tt2000
+    for (s, v) in (
+            ("2016-12-31T23:59:30", 536500838184000000),
+            ("2016-12-31T23:59:59.5", 536500867684000000),
+            ("2017-01-01T00:00:00", 536500869184000000),
+            ("2015-06-30T23:59:50", 488980857184000000),
+            ("1971-12-31T23:59:59.5", -883655958425054000),
+            ("1965-03-15T12:00:00", -1098143964080614000),
+        )
+        dt = DateTime(s)
+        @test Dates.value(TT2000(dt)) == v
+        @test DateTime(TT2000(v)) == dt
+    end
+    # inserted leap second 2016-12-31T23:59:60.5
+    @test DateTime(TT2000(536500868684000000)) == DateTime("2017-01-01T00:00:00.5")
+end
+
 @testset "Epoch16" begin
     t = Epoch16(6.377810224e10, 8.97e11)
     @test t == DateTime(2021, 1, 17, 11, 30, 40, 897)

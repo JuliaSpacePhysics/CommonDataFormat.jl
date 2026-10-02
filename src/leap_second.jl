@@ -85,3 +85,10 @@ function leap_second(ns_from_1970::Int64)
         return floor(Int64, seconds * NS_IN_SECOND)
     end
 end
+
+# Inverse of `utc + leap_second(utc)`. The second lookup corrects for the TT scale being ahead by the
+# offset; a TT instant inside an inserted leap second maps onto the following UTC second (as cdflib does).
+function utc_from_tt(tt_ns_from_1970::Int64)
+    utc = tt_ns_from_1970 - leap_second(tt_ns_from_1970)
+    return tt_ns_from_1970 - leap_second(utc)
+end
