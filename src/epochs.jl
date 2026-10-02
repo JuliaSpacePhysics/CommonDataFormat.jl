@@ -91,8 +91,7 @@ end
 function Dates.DateTime(epoch::TT2000)
     # TT2000 to Unix time with leap second correction
     ns_from_1970 = epoch.instant.value + TT2000_OFFSET
-    leap_seconds_ns = leap_second(ns_from_1970)
-    return DateTime(1970) + Nanosecond(ns_from_1970 - leap_seconds_ns)
+    return DateTime(1970) + Nanosecond(utc_from_tt(ns_from_1970))
 end
 
 # Conversion from TimeType
