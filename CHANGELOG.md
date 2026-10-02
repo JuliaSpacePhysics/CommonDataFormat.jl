@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-02
+
 ### Changed
 
 - **Breaking**: `Date`, `DateTime` and `Timestamp` promote to the CDF epoch type (`TT2000`, `Epoch16`, `Epoch`) instead of the epoch promoting to `DateTime`, so mixed comparisons and differences are exact: to the nanosecond, and across leap seconds for `TT2000` ([#74]).
@@ -23,7 +25,8 @@
 
 - **Breaking**: Renamed exported enum `DataType` to `CDFDataType` ([#46]) as the old name collided with `Base.DataType`.
 
-[Unreleased]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/releases/tag/v0.2.0
 
 [#74]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/pull/74
