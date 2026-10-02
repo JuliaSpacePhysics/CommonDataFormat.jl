@@ -19,7 +19,7 @@ PrecompileTools.@setup_workload begin
                 Array(var)
                 var[1]
                 var[ntuple(_ -> Colon(), ndims(var) - 1)..., 1:1]
-                eltype(var) <: CDFDateTime && DateTime.(var[1:1])
+                eltype(var) <: CDFDateTime && (DateTime.(var[1:1]); Timestamp.(var[1:1]); string(var[1]))
             end
         end
     end
