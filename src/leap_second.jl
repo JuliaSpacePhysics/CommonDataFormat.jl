@@ -5,7 +5,6 @@
 # TT2000 offset constant from C++ implementation
 const TT2000_OFFSET = Int64(946727967816000000)  # nanoseconds from 1970 to J2000 with corrections
 const UNIX_EPOCH = DateTime(1970, 1, 1)
-const PRE1972_CUTOFF = DateTime(1972, 1, 1)
 const MJD_BASE = 2_400_000.5
 const NS_IN_SECOND = Int64(1_000_000_000)
 
@@ -75,20 +74,21 @@ function leap_seconds_pre1972(date)
     return entry[2] + (mjd - entry[3]) * entry[4]
 end
 
-function leap_second(ns_from_1970::Int64)
-    dt = UNIX_EPOCH + Nanosecond(ns_from_1970)
-    if dt >= PRE1972_CUTOFF
+# Branch and floor on the nanosecond count: `DateTime + Nanosecond` rounds to the millisecond,
+# which would push instants just below a day boundary into the next day's offset.
+function leap_second(ns_from_1970::Integer)
+    if ns_from_1970 >= LEAP_SECONDS_TT2000[1][1]
         idx = findlast(x -> x[1] <= ns_from_1970, LEAP_SECONDS_TT2000)
         return LEAP_SECONDS_TT2000[idx][2]
     else
-        seconds = leap_seconds_pre1972(dt)
+        seconds = leap_seconds_pre1972(UNIX_EPOCH + Millisecond(Int64(fld(ns_from_1970, 1_000_000))))
         return floor(Int64, seconds * NS_IN_SECOND)
     end
 end
 
 # Inverse of `utc + leap_second(utc)`. The second lookup corrects for the TT scale being ahead by the
 # offset; a TT instant inside an inserted leap second maps onto the following UTC second (as cdflib does).
-function utc_from_tt(tt_ns_from_1970::Int64)
+function utc_from_tt(tt_ns_from_1970::Integer)
     utc = tt_ns_from_1970 - leap_second(tt_ns_from_1970)
     return tt_ns_from_1970 - leap_second(utc)
 end

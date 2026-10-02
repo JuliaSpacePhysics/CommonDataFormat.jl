@@ -7,6 +7,7 @@
 
 import Base: promote_rule, -, +
 using Dates: value, toms, tons
+using Durations: Timestamp
 
 include("leap_second.jl")
 
@@ -63,12 +64,10 @@ end
 
 TT2000(instant::Int64) = TT2000(Nanosecond(instant))
 
-TT2000(dt::TimeType) = convert(TT2000, dt)
-Epoch(dt::TimeType) = convert(Epoch, dt)
-
-fillvalue(::Epoch) = -1.0e31
-fillvalue(::Epoch16) = -1.0e31
-fillvalue(::TT2000) = 9999
+# ISTP FILLVAL
+_isfill(x::Epoch) = x.instant == -1.0e31
+_isfill(x::Epoch16) = x.seconds == -1.0e31
+_isfill(x::TT2000) = x.instant.value == typemin(Int64)
 
 (-)(epoch::Epoch, other::Epoch) = Millisecond(round(Int64, epoch.instant - other.instant))
 (-)(epoch::Epoch16, other::Epoch16) = Picosecond((epoch.seconds - other.seconds) * 1.0e12 + epoch.picoseconds - other.picoseconds)
@@ -76,38 +75,59 @@ fillvalue(::TT2000) = 9999
 (-)(tt2000::TT2000, other::Period) = TT2000(value(tt2000) - tons(other))
 (+)(epoch::Epoch, other::Period) = Epoch(value(epoch) + toms(other))
 (-)(epoch::Epoch, other::Period) = Epoch(value(epoch) - toms(other))
-
-# Conversion to DateTime
-function Dates.DateTime(epoch::Epoch)
-    return DateTime(0) + Millisecond(round(Int64, epoch.instant))
+# Whole seconds are split off first: a Float64 picosecond count is only exact within ~2.5 hours.
+function (+)(epoch::Epoch16, other::Period)
+    s, ns = fldmod(tons(other), 1_000_000_000)
+    carry, ps = fldmod(epoch.picoseconds + 1.0e3 * ns, 1.0e12)
+    return Epoch16(epoch.seconds + s + carry, ps)
 end
+(-)(epoch::Epoch16, other::Period) = epoch + (-other)
 
-function Dates.DateTime(epoch::Epoch16)
-    s_since_unix = epoch.seconds - EPOCH_OFFSET_SECONDS
-    total_ms = s_since_unix * 1.0e3 + epoch.picoseconds / 1.0e9
-    return DateTime(1970) + Millisecond(round(Int64, total_ms))
-end
+Base.isless(x::Epoch16, y::Epoch16) = isless((x.seconds, x.picoseconds), (y.seconds, y.picoseconds))
 
-function Dates.DateTime(epoch::TT2000)
-    # TT2000 to Unix time with leap second correction
-    ns_from_1970 = epoch.instant.value + TT2000_OFFSET
-    return DateTime(1970) + Nanosecond(utc_from_tt(ns_from_1970))
-end
+# UTC nanoseconds since the Unix epoch. Int128: Epoch16 spans years 0-9999 and TT2000 reaches
+# 2292, both beyond an Int64 nanosecond count.
+_unix_ns(x::TT2000) = utc_from_tt(Int128(x.instant.value) + TT2000_OFFSET)
+_unix_ns(x::Epoch16) = (Int128(x.seconds) - Int128(EPOCH_OFFSET_SECONDS)) * 1_000_000_000 + fld(Int128(x.picoseconds), 1000)
+_unix_ns(dt::Timestamp{P}) where {P} = Int128(value(dt)) * tons(P(1))
+_unix_ns(dt::TimeType) = (Int128(value(DateTime(dt))) - Dates.UNIXEPOCH) * 1_000_000
 
-# Conversion from TimeType
-function Epoch16(dt::DateTime)
-    ms_since_unix = value(dt - DateTime(1970, 1, 1))
-    s_since_unix = div(ms_since_unix, 1000)
-    s_total = s_since_unix + EPOCH_OFFSET_SECONDS
-    ps_component = rem(ms_since_unix, 1000) * 1000000000  # Convert nanoseconds remainder to picoseconds
-    return Epoch16(s_total, ps_component)
-end
+# Int128 division is a slow library call, and nearly every instant fits an Int64.
+_fld(ns::Int128, d::Int64) = typemin(Int64) <= ns <= typemax(Int64) ? fld(ns % Int64, d) : Int64(fld(ns, d))
+
+# Floored to the millisecond, so calendar fields never run ahead of the instant.
+Dates.DateTime(x::Union{TT2000, Epoch16}) = DateTime(Dates.UTM(_fld(_unix_ns(x), 1_000_000) + Dates.UNIXEPOCH))
+Dates.DateTime(epoch::Epoch) = DateTime(0) + Millisecond(round(Int64, epoch.instant))
+
+Timestamp{P}(x::CDFDateTime) where {P} = convert(Timestamp{P}, x)
+Base.convert(::Type{Timestamp}, x::CDFDateTime) = convert(Timestamp{Nanosecond}, x)
+Base.convert(::Type{Timestamp{P}}, x::Union{TT2000, Epoch16}) where {P} = convert(Timestamp{P}, Nanosecond(Int64(_unix_ns(x))))
+Base.convert(::Type{Timestamp{P}}, x::Epoch) where {P} = convert(Timestamp{P}, DateTime(x))
+Base.convert(::Type{DateTime}, x::CDFDateTime) = DateTime(x)
+
+# Calendar fields and printing. Epoch and Epoch16 span years 0-9999, far beyond
+# Timestamp{Nanosecond} (1677-2262), so only TT2000 gets nanosecond fields.
+_calendar(x::TT2000) = Timestamp{Nanosecond}(x)
+_calendar(x::CDFDateTime) = DateTime(x)
+
+TT2000(dt::TimeType) = convert(TT2000, dt)
+Epoch(dt::TimeType) = convert(Epoch, dt)
+Epoch16(dt::TimeType) = convert(Epoch16, dt)
 
 function Base.convert(::Type{TT2000}, dt::TimeType)
-    ns_since_unix = (DateTime(dt) - DateTime(1970, 1, 1)).value * 1_000_000
-    leap_seconds_ns = leap_second(ns_since_unix)
-    tt2000_value = ns_since_unix - TT2000_OFFSET + leap_seconds_ns
-    return TT2000(tt2000_value)
+    ns_since_unix = _unix_ns(dt)
+    return TT2000(Int64(ns_since_unix - TT2000_OFFSET + leap_second(ns_since_unix)))
+end
+
+function Base.convert(::Type{Epoch16}, dt::TimeType)
+    s, ns = fldmod(_unix_ns(dt), 1_000_000_000)
+    return Epoch16(Float64(s + Int128(EPOCH_OFFSET_SECONDS)), Float64(ns * 1000))
+end
+
+# Int64 path for the common case; the Int128 division above is several times slower.
+function Base.convert(::Type{Epoch16}, dt::DateTime)
+    s, ms = fldmod(value(dt) - Dates.UNIXEPOCH, 1000)
+    return Epoch16(s + EPOCH_OFFSET_SECONDS, ms * 1.0e9)
 end
 
 function Base.convert(::Type{Epoch}, dt::TimeType)
@@ -119,38 +139,70 @@ for t in (:Epoch, :Epoch16, :TT2000)
     @eval Base.convert(::Type{$t}, dt::$t) = dt
 end
 
-for f in (:year, :month, :day, :hour, :minute, :second, :millisecond)
-    @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(DateTime(epoch))
+for f in (:Date, :Time, :days, :year, :month, :day, :hour, :minute, :second, :millisecond)
+    @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(_calendar(epoch))
+end
+for f in (:microsecond, :nanosecond)
+    @eval Dates.$f(epoch::TT2000) = Dates.$f(_calendar(epoch))
+end
+
+# Callers guarantee `r` is in bounds.
+@inline function _parse_int(b, r)
+    x = 0
+    for i in r
+        d = @inbounds(b[i]) - 0x30
+        d <= 0x09 || throw(ArgumentError("invalid digit in date string"))
+        x = 10x + d
+    end
+    return x
+end
+
+# Returns the whole seconds as a DateTime (full year range, unlike Timestamp{Nanosecond}) and the
+# fraction in picoseconds. "yyyy-mm-ddTHH:MM:SS[.f...]" is read straight from the bytes so no
+# fractional digit is dropped; any other shape goes to the Dates parser.
+function _parse_epoch(s::AbstractString)
+    b = codeunits(s)
+    n = length(b)
+    iso = @inbounds (n == 19 || 21 <= n <= 32 && b[20] == UInt8('.')) && b[5] == b[8] == UInt8('-') &&
+        b[11] == UInt8('T') && b[14] == b[17] == UInt8(':')
+    iso || return DateTime(s), 0
+    dt = DateTime(
+        _parse_int(b, 1:4), _parse_int(b, 6:7), _parse_int(b, 9:10),
+        _parse_int(b, 12:13), _parse_int(b, 15:16), _parse_int(b, 18:19)
+    )
+    return dt, _parse_int(b, 21:n) * 10^(32 - n)
 end
 
 Epoch(s::AbstractString) = Epoch(DateTime(s))
-Epoch16(s::AbstractString) = Epoch16(DateTime(s))
-TT2000(s::AbstractString) = TT2000(DateTime(s))
+function Epoch16(s::AbstractString)
+    dt, ps = _parse_epoch(s)
+    epoch = Epoch16(dt)
+    return Epoch16(epoch.seconds, epoch.picoseconds + ps)
+end
+function TT2000(s::AbstractString)
+    dt, ps = _parse_epoch(s)
+    ns, r = divrem(ps, 1000)
+    iszero(r) || throw(InexactError(:TT2000, TT2000, s))
+    return TT2000(dt) + Nanosecond(ns)
+end
 
 Dates.value(epoch::Epoch) = epoch.instant
 Dates.value(epoch::Epoch16) = ComplexF64(epoch.seconds, epoch.picoseconds)
 Dates.value(epoch::TT2000) = epoch.instant.value
 
 function Base.floor(x::T, p::Union{DatePeriod, TimePeriod}) where {T <: CDFDateTime}
-    return convert(T, floor(convert(DateTime, x), p))
+    return convert(T, floor(_calendar(x), p))
 end
 
-function Base.show(io::IO, epoch::CDFDateTime)
-    fillval = fillvalue(epoch)
-    return if fillval == Dates.value(epoch)
-        print(io, "FILLVAL")
-    else
-        print(io, DateTime(epoch))
-    end
-end
-function Base.show(io::IO, epoch::Epoch16)
-    return print(io, DateTime(epoch))
-end
+Base.show(io::IO, epoch::CDFDateTime) = _isfill(epoch) ? print(io, "FILLVAL") : print(io, _calendar(epoch))
 
-Base.promote_rule(::Type{<:CDFDateTime}, ::Type{Dates.DateTime}) = Dates.DateTime
-Base.promote_rule(::Type{T}, ::Type{Dates.Date}) where {T <: CDFDateTime} = T
-# Comment out because of invalidation
-Base.convert(::Type{Dates.DateTime}, x::CDFDateTime) = Dates.DateTime(x)
+# Promote towards the CDF type: UTC -> TT2000 is injective, whereas TT2000 -> UTC folds each
+# inserted leap second onto the following second, so comparing in UTC would equate distinct instants.
+Base.promote_rule(::Type{T}, ::Type{<:Union{Date, DateTime}}) where {T <: CDFDateTime} = T
+Base.promote_rule(::Type{T}, ::Type{<:Timestamp}) where {T <: Union{TT2000, Epoch16}} = T
+Base.promote_rule(::Type{Epoch}, ::Type{T}) where {T <: Timestamp} = promote_type(DateTime, T)
+Base.promote_rule(::Type{TT2000}, ::Type{<:Union{Epoch, Epoch16}}) = TT2000
+Base.promote_rule(::Type{Epoch16}, ::Type{Epoch}) = Epoch16
 Base.bswap(x::Epoch) = Epoch(Base.bswap(x.instant))
 Base.bswap(x::Epoch16) = Epoch16(Base.bswap(x.seconds), Base.bswap(x.picoseconds))
 Base.bswap(x::TT2000) = TT2000(Base.bswap(x.instant.value))

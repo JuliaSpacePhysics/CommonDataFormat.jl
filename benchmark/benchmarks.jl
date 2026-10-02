@@ -1,5 +1,6 @@
 using BenchmarkTools
 using CommonDataFormat
+using Dates
 using Downloads
 
 const SUITE = BenchmarkGroup()
@@ -33,4 +34,18 @@ let ds = CDFDataset(MMS_FILE), var = ds["mms1_scm_acb_gse_scsrvy_srvy_l2"]
     g["sum_slice"] = @benchmarkable sum($var[:, 100:100000])
     g["sum_var_access"] = @benchmarkable sum($var[:, 100:100000])
     g["full_load"] = @benchmarkable full_load(MMS_FILE)
+end
+
+# Inputs stay within what every epoch type could always represent (millisecond strings, modern
+# dates) so the suite also runs on older revisions for comparison.
+let tt = TT2000(DateTime(2020)) .+ Millisecond.(1:10_000), dt = DateTime.(tt),
+        e16 = Epoch16.(dt), strs = string.(dt)
+    g = SUITE["epochs"] = BenchmarkGroup()
+    g["TT2000_to_DateTime"] = @benchmarkable DateTime.($tt)
+    g["DateTime_to_TT2000"] = @benchmarkable TT2000.($dt)
+    g["TT2000_vs_DateTime"] = @benchmarkable count(<($(dt[end ÷ 2])), $tt)
+    g["Epoch16_vs_DateTime"] = @benchmarkable count(==($(dt[end ÷ 2])), $e16)
+    g["TT2000_parse"] = @benchmarkable TT2000.($strs)
+    g["Epoch16_parse"] = @benchmarkable Epoch16.($strs)
+    g["TT2000_string"] = @benchmarkable foreach(x -> print(devnull, x), $tt)
 end
