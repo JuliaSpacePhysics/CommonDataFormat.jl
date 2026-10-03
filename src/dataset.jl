@@ -22,7 +22,7 @@ cdf = CDFDataset("data.cdf")
 ```
 """
 function CDFDataset(filename)
-    fname = String(filename)
+    fname = String(filename)::String
     # `open(f, name, mode) do` form: routes through varargs splatting (`_apply_iterate`) which `juliac --trim` can't resolve.
     io = open(fname, "r")
     try

@@ -98,5 +98,9 @@ function _swap_words!(p::Ptr{U}, n::Int) where {U}
     end
     return
 end
+# `pointer` goes through `cconvert`, so when `T` is not inferred any new
+# `cconvert(::Type{Ptr{X}}, ::Vector)` method (e.g. LibGit2's) invalidates the caller.
+_ptr(a::Array{T}) where {T} = Base.unsafe_convert(Ptr{T}, a)
+
 _byte_swap!(data::Array{T}) where {T} =
-    GC.@preserve data _byte_swap!(Ptr{UInt8}(pointer(data)), sizeof(data), _swap_unit(T))
+    GC.@preserve data _byte_swap!(Ptr{UInt8}(_ptr(data)), sizeof(data), _swap_unit(T))
