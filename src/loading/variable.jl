@@ -65,7 +65,7 @@ function _majority_swap!(data::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, nrec::I
     end
     sstrides[k+1] = record_bytes
     chunk = clamp((1 << 20) ÷ record_bytes, 1, nrec)
-    dims = [rdims; chunk]
+    dims = push!(copy(rdims), chunk)
     temp = Vector{UInt8}(undef, chunk * record_bytes)
     GC.@preserve temp for r0 in 0:chunk:(nrec-1)
         n = min(chunk, nrec - r0)
@@ -89,7 +89,7 @@ function _copy_subblock!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, rdims::Vect
         s *= rdims[i]
     end
     sstrides[k+1] = s
-    dims = [length.(ranges); nrec]
+    dims = push!(length.(ranges), nrec)
     _copy_block!(dst, src + off, esz, dims, sstrides)
     return
 end
@@ -104,7 +104,7 @@ function DiskArrays.readblock!(var::CDFVariable{T,N}, dest::AbstractArray{T}, ra
     rdims = Int[Base.front(var.dims)...]
     other_ranges = UnitRange{Int}[Int(first(r)):Int(last(r)) for r in Base.front(ranges)]
     rec_range = Int(first(ranges[end])):Int(last(ranges[end]))
-    GC.@preserve dest _readblock!(Ptr{UInt8}(pointer(dest)), sizeof(T), rdims, other_ranges, rec_range, var.vdr, var.parentdataset)
+    GC.@preserve dest _readblock!(Ptr{UInt8}(_ptr(dest)), sizeof(T), rdims, other_ranges, rec_range, var.vdr, var.parentdataset)
     is_big_endian_encoding(var) && _byte_swap!(dest)
     return dest
 end
