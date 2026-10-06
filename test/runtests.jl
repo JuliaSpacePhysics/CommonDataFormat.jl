@@ -11,9 +11,6 @@ include("cdf2_test.jl")
 include("CommonDataModelExt_test.jl")
 include("decompress_test.jl")
 include("parsing_test.jl")
-@testset "StaticString" begin
-    include("staticstring.jl")
-end
 
 @testset "Aqua" begin
     using Aqua

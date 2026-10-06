@@ -126,10 +126,8 @@ ds = CDFDataset(file)
     @test Set(keys(ds)) == Set(keys(EXPECTED_VARIABLES))
 end
 
-@testset "StaticString" begin
-    using CommonDataFormat: StaticString
-    @test typeof(ds["var_string"][1]) == StaticString{16, UInt8}
-    @test String(ds["var_string"][1]) == "This is a string"
+@testset "CHAR" begin
+    @test ds["var_string"][1] == "This is a string"
 end
 
 @testset "DateTime Conversions" begin

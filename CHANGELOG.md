@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking**: `CDF_CHAR`/`CDF_UCHAR` variables have eltype `String` (trailing null padding stripped); `StaticString` is removed. Avoids a recompile for each new string width ([#79]).
+
 ## [0.3.0] - 2026-10-02
 
 ### Changed
@@ -29,5 +33,6 @@
 [0.3.0]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/releases/tag/v0.2.0
 
+[#79]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/pull/79
 [#74]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/pull/74
 [#46]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/pull/46

@@ -1,7 +1,7 @@
 # Seed one variable per common (eltype, ndims) shape, per CDF v2/v3 offset width. Every new combination costs DiskArrays indexing compiles, so rarer
-# shapes (integers, Epoch16, >3-D, extra string widths) are left out.
-_workload_key(var) = (eltype(var) <: StaticString ? StaticString : eltype(var), ndims(var), recordsize_type(var.parentdataset))
-_workload_maxdims(T) = T <: AbstractFloat ? 3 : T <: StaticString ? 2 : T in (TT2000, Epoch) ? 1 : 0
+# shapes (integers, Epoch16, >3-D) are left out.
+_workload_key(var) = (eltype(var), ndims(var), recordsize_type(var.parentdataset))
+_workload_maxdims(T) = T <: AbstractFloat ? 3 : T === String ? 2 : T in (TT2000, Epoch) ? 1 : 0
 
 PrecompileTools.@setup_workload begin
     files = joinpath.(@__DIR__, "../data", ("elb_l2_epdef_20210914_v01.cdf", "a_cdf_with_compressed_vars.cdf", "ac_h2_sis_20101105_v06.cdf"))

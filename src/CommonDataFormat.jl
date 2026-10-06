@@ -38,7 +38,6 @@ end
 include("epochs.jl")
 include("enums.jl")
 include("types.jl")
-include("staticstring.jl")
 include("parsing.jl")
 include("decompress.jl")
 include("records/records.jl")
