@@ -120,6 +120,11 @@ end
     @test occursin("compressed", string(var.vdr))
 end
 
+@testset "NOVARY z-variable dimension" begin
+    v = CDFDataset(data_path("novary_z.cdf"))["novary"]  # row-major, declared (2,3,4), dim 2 NOVARY
+    @test Array(v) == permutedims(reshape(Int32(0):Int32(39), 4, 2, 5), (2, 1, 3))
+end
+
 @testset "CHECK_VARIABLES - Variable structure verification" begin
     file = data_path("omni_coho1hr_merged_mag_plasma_20240901_v01.cdf")
     ds = CDFDataset(file)

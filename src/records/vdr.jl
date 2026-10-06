@@ -44,35 +44,41 @@ Load a z- or r-Variable Descriptor Record from the buffer at the specified offse
     return VDR{FieldSizeT}(fields..., true, z_num_dims, pos)
 end
 
-function record_sizes(vdr::VDR, cdf, ::Val{M}) where {M}
-    vdr.zvar || return _rvar_record_sizes(vdr, cdf, Val(M))
-    vdr.num_dims == M ||
-        throw(DimensionMismatch("variable has $(vdr.num_dims) dimensions, expected $M"))
-    return read_be(parent(cdf), vdr.pos, Val(M), Int32)
+# (declared dim count, position of their sizes, position of their DimVarys)
+function _dim_layout(vdr::VDR, cdf)
+    vdr.zvar && return Int(vdr.num_dims), vdr.pos, vdr.pos + 4 * Int(vdr.num_dims)
+    gdr = GDR(cdf)
+    return Int(gdr.r_num_dims), gdr.pos + sizeof(Int64) + 3 * sizeof(Int32), vdr.pos
 end
 
-function _rvar_record_sizes(vdr::VDR, cdf, ::Val{M}) where {M}
-    gdr = GDR(cdf)
-    buf = parent(cdf)
-    sizes_pos = gdr.pos + sizeof(Int64) + 3 * sizeof(Int32)
-    sizes = zeros(Int32, M)
-    count = 0
-    for i in 1:Int(gdr.r_num_dims)
-        read_be(buf, vdr.pos + (i - 1) * 4, Int32) == 0 && continue
-        count += 1
-        count <= M && (sizes[count] = read_be(buf, sizes_pos + (i - 1) * 4, Int32))
+_varies(buf, varys_pos, i) = read_be(buf, varys_pos + (i - 1) * 4, Int32) != 0
+
+# Declared index of the `j`-th varying dimension
+function _varying_dim(buf, varys_pos, j)
+    i = 0
+    while j > 0
+        i += 1
+        j -= _varies(buf, varys_pos, i)
     end
-    count == M || throw(DimensionMismatch("variable has $count dimensions, expected $M"))
-    return ntuple(i -> sizes[i], Val(M))
+    return i
+end
+
+# NOVARY dimensions aren't physically stored, so they aren't array dimensions either.
+# `M` must be `num_record_dims(vdr, cdf)`.
+function record_sizes(vdr::VDR, cdf, ::Val{M}) where {M}
+    n, sizes_pos, varys_pos = _dim_layout(vdr, cdf)
+    buf = parent(cdf)
+    n == M && return read_be(buf, sizes_pos, Val(M), Int32)
+    return ntuple(j -> read_be(buf, sizes_pos + (_varying_dim(buf, varys_pos, j) - 1) * 4, Int32), Val(M))
 end
 
 function num_record_dims(vdr::VDR, cdf)
-    vdr.zvar && return Int(vdr.num_dims)
-    n = 0
-    for i in 1:Int(GDR(cdf).r_num_dims)
-        n += read_be(parent(cdf), vdr.pos + (i - 1) * 4, Int32) != 0
+    n, _, varys_pos = _dim_layout(vdr, cdf)
+    count = 0
+    for i in 1:n
+        count += _varies(parent(cdf), varys_pos, i)
     end
-    return n
+    return count
 end
 
 
