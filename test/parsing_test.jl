@@ -41,3 +41,8 @@ end
     @test Dict(la)["VAR_TYPE"] == "metadata"
     @test length(ds.vattrib["FIELDNAM"]) == length(ds)
 end
+
+@testset "CHAR null padding" begin
+    bytes = UInt8['a', 'b', 0, 0, 'c', 0, 'd', 0]
+    @test CommonDataFormat._fill_strings!(Vector{String}(undef, 2), bytes, 4) == ["ab", "c\0d"]
+end

@@ -101,12 +101,43 @@ function DiskArrays.readblock!(var::CDFVariable{T,N}, dest::AbstractArray{T}, ra
         copyto!(dest, DiskArrays.readblock!(var, Array{T}(undef, size(dest)), ranges...))
         return dest
     end
+    GC.@preserve dest _readblock!(Ptr{UInt8}(_ptr(dest)), sizeof(T), _block_args(var, ranges)..., var.vdr, var.parentdataset)
+    is_big_endian_encoding(var) && _byte_swap!(dest)
+    return dest
+end
+
+# CHAR elements are `num_elems`-byte fields, null-padded; the string ends at the trailing-null run.
+function DiskArrays.readblock!(var::CDFVariable{String,N}, dest::AbstractArray{String}, ranges::Vararg{AbstractUnitRange{<:Integer},N}) where {N}
+    N > 0 && @boundscheck checkbounds(var, ranges...)
+    isempty(dest) && return dest
+    if !(dest isa Array)
+        copyto!(dest, DiskArrays.readblock!(var, Array{String}(undef, size(dest)), ranges...))
+        return dest
+    end
+    w = Int(var.vdr.num_elems)
+    bytes = Vector{UInt8}(undef, w * length(dest))
+    GC.@preserve bytes _readblock!(pointer(bytes), w, _block_args(var, ranges)..., var.vdr, var.parentdataset)
+    _fill_strings!(vec(dest), bytes, w)
+    return dest
+end
+
+function _fill_strings!(dest::Vector{String}, bytes::Vector{UInt8}, w::Int)
+    GC.@preserve bytes for k in eachindex(dest)
+        o = (k - 1) * w
+        n = w
+        while n > 0 && iszero(@inbounds bytes[o + n])
+            n -= 1
+        end
+        dest[k] = unsafe_string(pointer(bytes, o + 1), n)
+    end
+    return dest
+end
+
+function _block_args(var::CDFVariable, ranges)
     rdims = Int[Base.front(var.dims)...]
     other_ranges = UnitRange{Int}[Int(first(r)):Int(last(r)) for r in Base.front(ranges)]
     rec_range = Int(first(ranges[end])):Int(last(ranges[end]))
-    GC.@preserve dest _readblock!(Ptr{UInt8}(_ptr(dest)), sizeof(T), rdims, other_ranges, rec_range, var.vdr, var.parentdataset)
-    is_big_endian_encoding(var) && _byte_swap!(dest)
-    return dest
+    return rdims, other_ranges, rec_range
 end
 
 function _readblock!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_ranges::Vector{UnitRange{Int}}, rec_range::UnitRange{Int}, vdr, ds)

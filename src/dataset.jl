@@ -102,13 +102,9 @@ end
 function _variable(cdf, name, vdr, ::Val{M}) where {M}
     dims = (map(Int, record_sizes(vdr, cdf, Val(M)))..., Int(vdr.max_rec) + 1)
     code = Int(vdr.data_type)
-    if code == CDF_CHAR || code == CDF_UCHAR # eltype depends on runtime num_elems
-        T = StaticString{Int(vdr.num_elems),UInt8}
-        return CDFVariable{T,M + 1,typeof(vdr),typeof(cdf)}(name, vdr, cdf, dims)
-    end
     # Branch to static constructor per element type
     return Base.Cartesian.@nif(
-        16,
+        18,
         d -> code == CODE_TYPE_PAIRS[d][1],
         d -> _construct(cdf, name, vdr, dims, CODE_TYPE_PAIRS[d][2]),
         d -> throw(ArgumentError("unsupported CDF data type $code"))

@@ -51,6 +51,7 @@ const CODE_TYPE_PAIRS = (
     (33, TT2000), (31, Epoch), (32, Epoch16),
     (1, Int8), (2, Int16), (4, Int32), (8, Int64),
     (11, UInt8), (12, UInt16), (14, UInt32), (41, Int8),
+    (51, String), (52, String),
 )
 
 const type_map = Dict{CDFDataType, Type}(CDFDataType(c) => T for (c, T) in CODE_TYPE_PAIRS)
