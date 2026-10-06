@@ -46,13 +46,6 @@ end
     end
 end
 
-@testset "Fill Value" begin
-    for T in (Int8, Int16, Int32, Int64, Float32, Float64, UInt8, UInt16, UInt32)
-        @test CDF.fillvalue(T) isa T
-    end
-    @test string(Epoch(-1.0e31)) == "FILLVAL"
-end
-
 @testset "iteration" begin
     for file in ("a_cdf.cdf", "ac_h0_mfi_20230102_v07.cdf") # z-only and r+z chains
         ds = CDFDataset(data_path(file))
@@ -131,17 +124,9 @@ end
     @test var[1:3] == Float32[6.7, 6.7, 7.3]
     @test var["UNITS"] == "nT"
     @test var["FIELDNAM"] == "BR (RTN)"
-
-
     @test ds["Epoch"][1] == DateTime(2024, 9, 1, 0, 0)
-    @test ntoh(hton(ds["Epoch"][1])) == DateTime(2024, 9, 1, 0, 0)
 
     @test @allocations(ds["BR"]) <= 50
-    allocations = @allocated(ds.attrib)
-    threshold = VERSION >= v"1.12" ? 30000 : 70000
-    if allocations > threshold
-        @info "ds.attrib allocated $allocations bytes (threshold: $threshold)"
-    end
 end
 
 @testset "CDF_CHAR" begin

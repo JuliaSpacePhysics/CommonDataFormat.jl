@@ -1,17 +1,7 @@
 using Downloads
 
 if !@isdefined(data_path)
-    function data_path(name)
-        for dir in [
-                joinpath(@__DIR__, "..", "ref", "CDFpp", "tests", "resources"),
-                joinpath(@__DIR__, "..", "ref", "cdflib", "tests", "testfiles"),
-                joinpath(@__DIR__, "..", "data")
-            ]
-            path = joinpath(dir, name)
-            isfile(path) && return path
-        end
-        error("Data file not found: $name")
-    end
+    data_path(name) = joinpath(@__DIR__, "..", "data", name)
 end
 
 # Download test data from URL and cache locally

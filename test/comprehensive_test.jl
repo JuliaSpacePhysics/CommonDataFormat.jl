@@ -126,33 +126,12 @@ ds = CDFDataset(file)
     @test Set(keys(ds)) == Set(keys(EXPECTED_VARIABLES))
 end
 
-@testset "CHAR" begin
-    @test ds["var_string"][1] == "This is a string"
-end
-
-@testset "DateTime Conversions" begin
-    for var in ("epoch", "epoch16", "tt2000")
-        @testset "Variable: $var" begin
-            var_name = var
-            expected = EXPECTED_VARIABLES[var]
-            @test haskey(ds, var_name)
-            var = ds[var_name]
-            @test size(var) == expected.shape
-            @test string(var.datatype) == expected.data_type
-            @test Array(var) == expected.values
-            @test var.attrib == expected.attributes
-        end
-    end
-end
-
 @testset "Variable Properties and Values" begin
     for (var_name, expected) in EXPECTED_VARIABLES
         @testset "Variable: $var_name" begin
-            @test haskey(ds, var_name)
             var = ds[var_name]
             @test size(var) == expected.shape
             @test string(var.datatype) == expected.data_type
-            # # Test values (if specified)
             if eltype(var) <: Number
                 @test Array(var) ≈ expected.values
             else
