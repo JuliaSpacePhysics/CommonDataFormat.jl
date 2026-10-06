@@ -59,13 +59,23 @@ end
 
 @inline write_be(v::Vector{UInt8}, i, ::RInt32) = i + _sizeof(RInt32)
 
-function readname(buf::Vector{UInt8}, offset::Int)
-    for i in offset:(offset + 255)
-        if buf[i] == 0x00
-            return @views buf[offset:(i - 1)]
-        end
+# Name fields are NUL-padded to a fixed width: 256 bytes in CDF v3, 64 in v2.
+_name_width(::Type{FST}) where {FST} = FST == Int64 ? 256 : 64
+
+function readname(buf::Vector{UInt8}, offset::Int, ::Type{FST}) where {FST}
+    last = offset + _name_width(FST) - 1
+    for i in offset:last
+        buf[i] == 0x00 && return @views buf[offset:(i - 1)]
     end
-    return @views buf[offset:(offset + 255)]
+    return @views buf[offset:last]
+end
+
+function name_equals(buf::Vector{UInt8}, offset::Int, name::String, ::Type{FST}) where {FST}
+    n = ncodeunits(name)
+    w = _name_width(FST)
+    n <= w || return false
+    (n == w || buf[offset + n] == 0x00) || return false
+    return GC.@preserve buf name ccall(:memcmp, Cint, (Ptr{UInt8}, Ptr{UInt8}, Csize_t), pointer(buf, offset), pointer(name), n) == 0
 end
 
 is_cdf_v3(magic_bytes) = magic_bytes == 0xCDF30001

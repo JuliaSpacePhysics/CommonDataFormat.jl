@@ -71,15 +71,15 @@ end
 _vdr_at(cdf::CDFDataset{FST}, offset::Int) where {FST} = VDR{FST}(parent(cdf), offset)
 
 # Name is the first variable-width field of a VDR; everything before it is fixed size.
-vdr_name(buffer, offset, ::Type{FST}) where {FST} = readname(buffer, offset + 45 + 5 * sizeof(FST))
+_vdr_name_pos(offset, ::Type{FST}) where {FST} = offset + 45 + 5 * sizeof(FST)
+vdr_name(buffer, offset, ::Type{FST}) where {FST} = readname(buffer, _vdr_name_pos(offset, FST), FST)
 # r-variables are chained first, then z-variables
 vdr_heads(cdf::CDFDataset) = (GDR(cdf).rVDRhead, GDR(cdf).zVDRhead)
 
 function find_vdr(cdf::CDFDataset{FST}, var_name::String) where {FST}
     buffer = parent(cdf)
-    var_name_bytes = codeunits(var_name)
     for head in vdr_heads(cdf), offset in OffsetsIterator{FST}(buffer, head)
-        vdr_name(buffer, offset, FST) == var_name_bytes && return _vdr_at(cdf, offset)
+        name_equals(buffer, _vdr_name_pos(offset, FST), var_name, FST) && return _vdr_at(cdf, offset)
     end
     return nothing
 end
