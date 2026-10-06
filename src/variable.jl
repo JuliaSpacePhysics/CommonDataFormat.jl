@@ -64,7 +64,7 @@ end
 Base.getindex(var::CDFVariable, name::String) = var.attrib[name]
 Base.haskey(var::CDFVariable, name::String) = haskey(var.attrib, name)
 
-attrib(var::CDFVariable) = LazyVAttrib(var.parentdataset, var.vdr.num)
+attrib(var::CDFVariable) = LazyVAttrib(var.parentdataset, var.vdr.num, var.vdr isa VDR)
 attrib(var::CDFVariable, name::String) = get(attrib(var), name)
 
 is_record_varying(v::CDFVariable) = is_record_varying(v.vdr)

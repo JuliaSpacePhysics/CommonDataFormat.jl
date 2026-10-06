@@ -1,13 +1,14 @@
 # Attribute loading functionality
 # Handles loading of ADR (Attribute Descriptor Record) and AEDR (Attribute Entry Descriptor Record) chains
 
-# Load all attribute entries for a given attribute from its AEDRs.
+# Load all attribute entries for a given attribute from its AEDRs: rEntries, then zEntries.
 @inline function load_attribute_entries(buffer::Vector{UInt8}, adr, ::Type{RecordSizeType}, needs_byte_swap) where {RecordSizeType}
-    head = max(adr.AgrEDRhead, adr.AzEDRhead)
-    offsets = OffsetsIterator{RecordSizeType}(buffer, head)
-    return map(offsets) do offset
+    load(head) = map(OffsetsIterator{RecordSizeType}(buffer, head)) do offset
         load_aedr_data(buffer, offset, RecordSizeType, needs_byte_swap)
     end
+    adr.AzEDRhead == 0 && return load(adr.AgrEDRhead)
+    adr.AgrEDRhead == 0 && return load(adr.AzEDRhead)
+    return vcat(load(adr.AgrEDRhead), load(adr.AzEDRhead))
 end
 
 """
@@ -46,10 +47,14 @@ function attrib(cdf::CDFDataset{FST}, name::String) where {FST}
 end
 
 # Lazy dict-like view of variable attributes; use Dict{String,Union{String,Vector}}(x) to materialize.
+# r- and z-variables are numbered independently, so `zvar` selects the entry chain `varnum` indexes.
 struct LazyVAttrib{CDF, N} <: AbstractDict{String, Union{String, Vector}}
     cdf::CDF
     varnum::N
+    zvar::Bool
 end
+
+_entry_head(la::LazyVAttrib, adr) = la.zvar ? adr.AzEDRhead : adr.AgrEDRhead
 
 function Base.iterate(la::LazyVAttrib, offset::Int = Int(la.cdf.gdr.ADRhead))
     offset == 0 && return nothing
@@ -64,10 +69,8 @@ function Base.iterate(la::LazyVAttrib, offset::Int = Int(la.cdf.gdr.ADRhead))
         end
         adr = ADR{RecordSizeType}(buffer, offset)
         next_offset = Int(adr.ADRnext)
-        for head in (adr.AgrEDRhead, adr.AzEDRhead)
-            head == 0 && continue
-            found = _search_aedr_entries(buffer, head, RecordSizeType, needs_byte_swap, la.varnum)
-            isnothing(found) && continue
+        found = _search_aedr_entries(buffer, _entry_head(la, adr), RecordSizeType, needs_byte_swap, la.varnum)
+        if !isnothing(found)
             name = String(adr.Name)
             return (name => _get_attributes(name, found, la.cdf), next_offset)
         end
@@ -96,13 +99,8 @@ function Base.get(la::LazyVAttrib, name::AbstractString, default = nothing)
         is_global(buffer, offset, RecordSizeType) && continue
         adr = ADR{RecordSizeType}(buffer, offset)
         adr.Name != name_bytes && continue
-        for head in (adr.AgrEDRhead, adr.AzEDRhead)
-            head == 0 && continue
-            found = _search_aedr_entries(buffer, head, RecordSizeType, needs_byte_swap, varnum)
-            isnothing(found) && continue
-            return _get_attributes(name, found, cdf)
-        end
-        return default
+        found = _search_aedr_entries(buffer, _entry_head(la, adr), RecordSizeType, needs_byte_swap, varnum)
+        return isnothing(found) ? default : _get_attributes(name, found, cdf)
     end
     return default
 end

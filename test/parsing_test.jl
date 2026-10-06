@@ -29,3 +29,15 @@ using CommonDataFormat: read_be_fields, write_be_fields, field_layout, RInt32, C
         @test out[mask] == buffer[pos:(endpos - 1)][mask]
     end
 end
+
+# r- and z-variables are numbered independently: rVar `Epoch` and zVar `label_BGSE` are both 0.
+@testset "Variable attributes in a file with r- and z-variables" begin
+    ds = CDFDataset(data_path("ac_k0_mfi_00000000_v01.cdf"))
+    @test ds["Epoch"].vdr.num == ds["label_BGSE"].vdr.num
+    @test ds["Epoch"].attrib["FIELDNAM"] == "Time"
+    la = ds["label_BGSE"].attrib
+    @test la["FIELDNAM"] == "Label for B in Cartesian GSE"
+    @test !haskey(la, "FILLVAL")
+    @test Dict(la)["VAR_TYPE"] == "metadata"
+    @test length(ds.vattrib["FIELDNAM"]) == length(ds)
+end
