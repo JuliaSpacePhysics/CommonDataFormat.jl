@@ -203,7 +203,7 @@ function collect_vxr_entries!(entries::Vector{VVREntry}, src, offset, ::Type{Fie
     return entries
 end
 
-function variable_compression(vdr::AbstractVDR{FieldSizeT}, cdf) where {FieldSizeT}
+function variable_compression(vdr::VDR{FieldSizeT}, cdf) where {FieldSizeT}
     offset_value = Int(vdr.cpr_or_spr_offset)
     if is_compressed(vdr) && offset_value != 0
         buffer = parent(cdf)

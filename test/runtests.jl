@@ -152,7 +152,7 @@ end
     file = data_path("ac_h0_mfi_20230102_v07.cdf")
     ds = CDFDataset(file)
     var = ds["BGSEc"]
-    @test var.vdr isa CommonDataFormat.rVDR
+    @test !var.vdr.zvar
     @test size(var) == (3, 5400)
 end
 
@@ -160,6 +160,6 @@ end
     file = download_test_data("https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/releases/download/v0.1.8/omni2_h0_mrg1hr_20150101_v01.cdf")
     ds = CDFDataset(file)
     var = ds["Epoch"]
-    @test var.vdr isa CommonDataFormat.rVDR
+    @test !var.vdr.zvar
     @test size(var) == (4344,)
 end

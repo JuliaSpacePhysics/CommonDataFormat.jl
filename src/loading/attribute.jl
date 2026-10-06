@@ -114,7 +114,8 @@ Base.haskey(la::LazyVAttrib, name) = false
 # https://github.com/SciQLop/PyISTP/blob/0a565c39c73dd800934bc379dd7c2e00c28d23d0/pyistp/_impl.py#L16
 function _get_attributes(name, value, cdf)
     if occursin("LABL_PTR", name)
-        return cdf[value][:]
+        # `Array` skips DiskArrays indexing
+        return vec(Array(cdf[value]))
     end
     return value
 end

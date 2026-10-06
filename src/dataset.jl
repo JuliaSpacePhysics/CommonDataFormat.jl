@@ -68,14 +68,7 @@ majority(cdf::CDFDataset) = majority(cdf.cdr)
     throw(ArgumentError("Unknown property $name"))
 end
 
-# Load the (z or r) VDR at a known offset
-function _vdr_at(cdf::CDFDataset{FST}, offset::Int) where {FST}
-    buffer = parent(cdf)
-    record_type = read_be(buffer, offset + 1 + sizeof(FST), Int32)
-    @assert record_type in (8, 3)
-    return record_type == 8 ? VDR{FST}(buffer, offset) :
-        rVDR{FST}(buffer, offset)
-end
+_vdr_at(cdf::CDFDataset{FST}, offset::Int) where {FST} = VDR{FST}(parent(cdf), offset)
 
 # Name is the first variable-width field of a VDR; everything before it is fixed size.
 vdr_name(buffer, offset, ::Type{FST}) where {FST} = readname(buffer, offset + 45 + 5 * sizeof(FST))
