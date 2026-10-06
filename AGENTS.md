@@ -1,6 +1,4 @@
+Reference implementations live in the gitignored `ref/`; consult them for spec details the CDF docs leave vague:
 
-There are two main reference implementation in ref/ folder. When having trouble implement the related function, refer to the reference implementation to understand the logic and the details. 
-- CDFpp is a C++ implementation. 
-- cdflib is a python implementation. 
-
-Simple and clear implementation is preferred than verbose and complex implementation. 
+- `ref/CDFpp`: C++, https://github.com/SciQLop/CDFpp
+- `ref/cdflib`: Python, https://github.com/MAVENSDC/cdflib
