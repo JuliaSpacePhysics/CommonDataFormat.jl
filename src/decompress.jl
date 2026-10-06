@@ -22,9 +22,9 @@ function decompress_bytes(data, compression::CompressionType; expected_bytes::Un
         input = convert(Vector{UInt8}, data)
         max_size = isnothing(expected_bytes) ? length(input) * 10 : expected_bytes
         output = Vector{UInt8}(undef, max_size)
-        decomp_result = gzip_decompress!(Decompressor(), output, input)
-        resize!(output, decomp_result.len)
-        output
+        n = GC.@preserve input output _unsafe_gzip_decompress!(Decompressor(), pointer(output), max_size, pointer(input), length(input))
+        n isa LibDeflateError && throw(ArgumentError("gzip decompression failed"))
+        resize!(output, n)
     elseif compression == RLECompression
         isnothing(expected_bytes) && throw(ArgumentError("RLE decompression requires expected size"))
         _rle_decompress(data, expected_bytes)
