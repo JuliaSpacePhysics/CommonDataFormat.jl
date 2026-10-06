@@ -28,27 +28,29 @@ end
 _after_name(offset, ::Type{FieldSizeT}) where {FieldSizeT} = FieldSizeT == Int64 ? offset + 341 : offset + 129
 
 """
-    VDR{FieldSizeT}(buffer, offset)
+    VDR{FieldSizeT}(buffer, offset, pad = 0)
 
 Load a z- or r-Variable Descriptor Record from the buffer at the specified offset.
 """
-@inline function VDR{FieldSizeT}(buffer::Vector{UInt8}, offset) where {FieldSizeT}
+@inline function VDR{FieldSizeT}(buffer::Vector{UInt8}, offset, pad = 0) where {FieldSizeT}
     record_type = get_record_type(buffer, offset, FieldSizeT)
     @assert record_type in (8, 3)
     zvar = record_type == 8
     pos = offset + sizeof(FieldSizeT) + 5
-    fields, _ = read_be_fields(buffer, pos, VDR{FieldSizeT}, Val(1:13))
-    after_name = _after_name(offset, FieldSizeT)
+    head, pos = read_be_fields(buffer, pos, VDR{FieldSizeT}, Val(1:10))
+    tail, _ = read_be_fields(buffer, pos + pad, VDR{FieldSizeT}, Val(11:13))
+    fields = (head..., tail...)
+    after_name = _after_name(offset, FieldSizeT) + pad
     zvar || return VDR{FieldSizeT}(fields..., false, Int32(0), after_name)
     z_num_dims, pos = read_be_i(buffer, after_name, Int32)
     return VDR{FieldSizeT}(fields..., true, z_num_dims, pos)
 end
 
 # (declared dim count, position of their sizes, position of their DimVarys)
-function _dim_layout(vdr::VDR, cdf)
+function _dim_layout(vdr::VDR{FST}, cdf) where {FST}
     vdr.zvar && return Int(vdr.num_dims), vdr.pos, vdr.pos + 4 * Int(vdr.num_dims)
     gdr = GDR(cdf)
-    return Int(gdr.r_num_dims), gdr.pos + sizeof(Int64) + 3 * sizeof(Int32), vdr.pos
+    return Int(gdr.r_num_dims), gdr.pos + sizeof(FST) + 3 * sizeof(Int32), vdr.pos
 end
 
 # PadValue (one element, file encoding) trails DimVarys; without one, the NASA library's

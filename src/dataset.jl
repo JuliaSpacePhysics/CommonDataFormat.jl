@@ -68,18 +68,23 @@ majority(cdf::CDFDataset) = majority(cdf.cdr)
     throw(ArgumentError("Unknown property $name"))
 end
 
-_vdr_at(cdf::CDFDataset{FST}, offset::Int) where {FST} = VDR{FST}(parent(cdf), offset)
+# Pre-2.5 VDRs have 128 extra reserved bytes before NumElems, shifting every later field.
+_vdr_pad(::CDFDataset{Int64}) = 0
+_vdr_pad(cdf::CDFDataset) = (cdr = cdf.cdr; cdr.version == 2 && cdr.release < 5 ? 128 : 0)
+
+_vdr_at(cdf::CDFDataset{FST}, offset::Int) where {FST} = VDR{FST}(parent(cdf), offset, _vdr_pad(cdf))
 
 # Name is the first variable-width field of a VDR; everything before it is fixed size.
-_vdr_name_pos(offset, ::Type{FST}) where {FST} = offset + 45 + 5 * sizeof(FST)
-vdr_name(buffer, offset, ::Type{FST}) where {FST} = readname(buffer, _vdr_name_pos(offset, FST), FST)
+_vdr_name_pos(offset, pad, ::Type{FST}) where {FST} = offset + 45 + 5 * sizeof(FST) + pad
+vdr_name(buffer, offset, pad, ::Type{FST}) where {FST} = readname(buffer, _vdr_name_pos(offset, pad, FST), FST)
 # r-variables are chained first, then z-variables
 vdr_heads(cdf::CDFDataset) = (GDR(cdf).rVDRhead, GDR(cdf).zVDRhead)
 
 function find_vdr(cdf::CDFDataset{FST}, var_name::String) where {FST}
     buffer = parent(cdf)
+    pad = _vdr_pad(cdf)
     for head in vdr_heads(cdf), offset in OffsetsIterator{FST}(buffer, head)
-        name_equals(buffer, _vdr_name_pos(offset, FST), var_name, FST) && return _vdr_at(cdf, offset)
+        name_equals(buffer, _vdr_name_pos(offset, pad, FST), var_name, FST) && return _vdr_at(cdf, offset)
     end
     return nothing
 end
@@ -119,9 +124,10 @@ Base.length(cdf::CDFDataset) = Int(GDR(cdf).NrVars + GDR(cdf).NzVars)
 function Base.keys(cdf::CDFDataset{FST}) where {FST}
     buffer = parent(cdf)
     varnames = Vector{String}(undef, length(cdf))
+    pad = _vdr_pad(cdf)
     i = 1
     for head in vdr_heads(cdf), offset in OffsetsIterator{FST}(buffer, head)
-        varnames[i] = String(vdr_name(buffer, offset, FST))
+        varnames[i] = String(vdr_name(buffer, offset, pad, FST))
         i += 1
     end
     return varnames
@@ -138,7 +144,7 @@ function Base.iterate(cdf::CDFDataset{FST}, state = (Int(GDR(cdf).rVDRhead), tru
         offset == 0 && return nothing
     end
     buffer = parent(cdf)
-    var = _variable(cdf, String(vdr_name(buffer, offset, FST)), _vdr_at(cdf, offset))
+    var = _variable(cdf, String(vdr_name(buffer, offset, _vdr_pad(cdf), FST)), _vdr_at(cdf, offset))
     return (var, (next_record_offset(buffer, offset, FST), in_rchain))
 end
 

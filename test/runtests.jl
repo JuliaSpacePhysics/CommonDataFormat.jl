@@ -144,6 +144,17 @@ end
     @test size(var) == (3, 5400)
 end
 
+@testset "CDF 2.4" begin
+    file = download_test_data("https://cdaweb.gsfc.nasa.gov/pub/data/canopus/mari_mag/1995/cn_k0_mari_19950102_v01.cdf")
+    ds = CDFDataset(file)
+    @test ds.version == (2, 4, 1)
+    @test keys(ds)[1:4] == ["Epoch", "Time_PB5", "DQF", "CU"]
+    var = ds["Time_PB5"]
+    @test size(var) == (3, 1440)
+    @test var[:, 2] == [1995, 2, 60000]
+    @test ds["CU"][1:3] == Float32[76.23, 78.16, 81.24]
+end
+
 @testset "r-variables 2" begin
     file = download_test_data("https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/releases/download/v0.1.8/omni2_h0_mrg1hr_20150101_v01.cdf")
     ds = CDFDataset(file)
