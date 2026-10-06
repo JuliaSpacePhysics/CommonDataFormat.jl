@@ -4,9 +4,6 @@
 [![DOI](https://zenodo.org/badge/1057373325.svg)](https://doi.org/10.5281/zenodo.17517061)
 [![version](https://juliahub.com/docs/General/CommonDataFormat/stable/version.svg)](https://juliahub.com/ui/Packages/General/CommonDataFormat)
 
-[![Build Status](https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/JuliaSpacePhysics/CommonDataFormat.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/JuliaSpacePhysics/CommonDataFormat.jl)
-
 A pure Julia implementation for reading [Common Data Format (CDF)](https://cdf.gsfc.nasa.gov/) files, widely used in space physics for storing multidimensional data arrays and metadata. See [CDFDatasets.jl](https://github.com/JuliaSpacePhysics/CDFDatasets.jl) for high-level interfaces.
 
 ## Quick Start
