@@ -51,6 +51,33 @@ function _dim_layout(vdr::VDR, cdf)
     return Int(gdr.r_num_dims), gdr.pos + sizeof(Int64) + 3 * sizeof(Int32), vdr.pos
 end
 
+# PadValue (one element, file encoding) trails DimVarys; without one, the NASA library's
+# default, which is not the ISTP FILLVAL.
+function pad_bytes(vdr::VDR, cdf, esz)
+    if has_pad_value(vdr)
+        n, _, varys_pos = _dim_layout(vdr, cdf)
+        pos = varys_pos + 4 * n
+        return parent(cdf)[pos:(pos + esz - 1)]
+    end
+    return default_pad_bytes(CDFDataType(vdr.data_type), esz, is_big_endian_encoding(cdf))
+end
+
+function default_pad_bytes(type, esz, big_endian)
+    type in (CDF_CHAR, CDF_UCHAR) && return fill(UInt8(' '), esz)
+    type in (CDF_INT1, CDF_BYTE) && return _encode(Int8(-127), big_endian)
+    type == CDF_INT2 && return _encode(Int16(-32767), big_endian)
+    type == CDF_INT4 && return _encode(Int32(-2147483647), big_endian)
+    type in (CDF_INT8, CDF_TIME_TT2000) && return _encode(-typemax(Int64), big_endian)
+    type == CDF_UINT1 && return _encode(UInt8(254), big_endian)
+    type == CDF_UINT2 && return _encode(UInt16(65534), big_endian)
+    type == CDF_UINT4 && return _encode(UInt32(4294967294), big_endian)
+    type in (CDF_REAL4, CDF_FLOAT) && return _encode(-1.0f30, big_endian)
+    type in (CDF_REAL8, CDF_DOUBLE) && return _encode(-1.0e30, big_endian)
+    return zeros(UInt8, esz)  # EPOCH, EPOCH16: 0000-01-01T00:00
+end
+
+_encode(x, big_endian) = collect(reinterpret(UInt8, [big_endian ? hton(x) : x]))
+
 _varies(buf, varys_pos, i) = read_be(buf, varys_pos + (i - 1) * 4, Int32) != 0
 
 # Declared index of the `j`-th varying dimension
@@ -104,4 +131,5 @@ end
 is_record_varying(vdr) = !is_nrv(vdr)
 """Whether or not the variable is a non-record variable"""
 is_nrv(vdr) = (vdr.flags & 0x01) == 0
+has_pad_value(vdr::VDR) = (vdr.flags & 0x02) != 0
 is_compressed(vdr::VDR) = (vdr.flags & 0x04) != 0

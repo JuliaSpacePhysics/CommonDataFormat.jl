@@ -142,8 +142,8 @@ end
 
 function _readblock!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_ranges::Vector{UnitRange{Int}}, rec_range::UnitRange{Int}, vdr, ds)
     entries = read_vvrs(vdr, ds)
-    isempty(entries) && return
     compression = any(e -> e.compressed, entries) ? variable_compression(vdr, ds) : NoCompression
+    virtual = _covers(entries, rec_range) ? NO_VIRTUAL : VirtualRecords(vdr.s_records == 2, pad_bytes(vdr, ds, esz))
     buffer = parent(ds)
     RST = recordsize_type(ds)
     swap = majority(ds) == Row
@@ -151,12 +151,12 @@ function _readblock!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_range
     record_bytes = prod(rdims) * esz
     if length.(other_ranges) == rdims
         dest_vec = unsafe_wrap(Vector{UInt8}, dest, nrec * record_bytes)
-        _read_records!(dest_vec, buffer, entries, first(rec_range), last(rec_range), record_bytes, compression, RST)
+        _read_records!(dest_vec, buffer, entries, first(rec_range), last(rec_range), record_bytes, compression, RST, virtual)
         swap && _majority_swap!(dest, esz, rdims, nrec)
     else
         scratch = Vector{UInt8}(undef, nrec * record_bytes)
         GC.@preserve scratch begin
-            _read_records!(scratch, buffer, entries, first(rec_range), last(rec_range), record_bytes, compression, RST)
+            _read_records!(scratch, buffer, entries, first(rec_range), last(rec_range), record_bytes, compression, RST, virtual)
             swap && _majority_swap!(pointer(scratch), esz, rdims, nrec)
             _copy_subblock!(dest, pointer(scratch), esz, rdims, other_ranges, nrec)
         end
@@ -178,11 +178,33 @@ function _record(var::CDFVariable{T,N}, r::Int) where {T,N}
     return dest
 end
 
+# Records absent from the VXR tree are virtual: sparse variables (sRecords) or records
+# never written. Previous-record sparse repeats the last physical record before the gap;
+# everything else, including a prev-sparse gap with no physical record before it, reads
+# as the pad value.
+struct VirtualRecords
+    prev::Bool
+    pad::Vector{UInt8}  # one element, in file encoding so the final byte swap covers it
+end
+
+const NO_VIRTUAL = VirtualRecords(false, UInt8[])
+
+function _covers(entries, rec_range)
+    r = first(rec_range)
+    for e in entries
+        e.last < r && continue
+        e.first > r && return false
+        r = e.last + 1
+        r > last(rec_range) && return true
+    end
+    return r > last(rec_range)
+end
+
 # Fill `dest` (exactly `nrec * record_bytes` bytes) with records `rec_first:rec_last`.
 # Element-type agnostic so the (threaded) decompression loop compiles once.
-function _read_records!(dest::Vector{UInt8}, buffer::Vector{UInt8}, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, record_bytes::Int, compression::CompressionType, ::Type{RST}) where {RST}
-    start_idx = findfirst(e -> e.first <= rec_first <= e.last, entries)::Int
-    end_idx = findfirst(e -> e.first <= rec_last <= e.last, entries)::Int
+function _read_records!(dest::Vector{UInt8}, buffer::Vector{UInt8}, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, record_bytes::Int, compression::CompressionType, ::Type{RST}, virtual::VirtualRecords) where {RST}
+    start_idx = something(findfirst(e -> e.last >= rec_first, entries), length(entries) + 1)
+    end_idx = something(findlast(e -> e.first <= rec_last, entries), 0)
     if compression == NoCompression
         for i in start_idx:end_idx
             _read_entry!(dest, buffer, entries[i], rec_first, rec_last, record_bytes, compression, RST, nothing)
@@ -197,7 +219,40 @@ function _read_records!(dest::Vector{UInt8}, buffer::Vector{UInt8}, entries::Vec
             end
         end
     end
+    r = rec_first
+    for i in start_idx:(end_idx + 1)
+        gap_end = i <= end_idx ? min(entries[i].first - 1, rec_last) : rec_last
+        r <= gap_end && _fill_virtual!(dest, buffer, entries, i - 1, r - rec_first, gap_end - r + 1, record_bytes, compression, RST, virtual)
+        i <= end_idx && (r = entries[i].last + 1)
+    end
     return dest
+end
+
+# Fill `n` records of `dest` starting `skip` records in; `prev_idx` is the last entry before the gap.
+function _fill_virtual!(dest, buffer, entries, prev_idx, skip, n, record_bytes, compression, ::Type{RST}, virtual) where {RST}
+    record = Vector{UInt8}(undef, record_bytes)
+    if virtual.prev && prev_idx >= 1
+        e = entries[prev_idx]
+        if compression == NoCompression
+            _read_entry!(record, buffer, e, e.last, e.last, record_bytes, compression, RST, nothing)
+        else
+            decompressor = take!(decompressors())
+            try
+                _read_entry!(record, buffer, e, e.last, e.last, record_bytes, compression, RST, decompressor)
+            finally
+                put!(decompressors(), decompressor)
+            end
+        end
+    else
+        esz = length(virtual.pad)
+        for k in 0:esz:(record_bytes - 1)
+            copyto!(record, k + 1, virtual.pad, 1, esz)
+        end
+    end
+    for j in 0:(n - 1)
+        copyto!(dest, (skip + j) * record_bytes + 1, record, 1, record_bytes)
+    end
+    return
 end
 
 function _read_entry!(dest, buffer, e::VVREntry, rec_first, rec_last, record_bytes, compression, ::Type{RST}, decompressor) where {RST}

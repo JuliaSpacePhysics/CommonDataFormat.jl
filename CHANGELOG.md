@@ -6,6 +6,10 @@
 
 - **Breaking**: `CDF_CHAR`/`CDF_UCHAR` variables have eltype `String` (trailing null padding stripped); `StaticString` is removed. Avoids a recompile for each new string width ([#79]).
 
+### Fixed
+
+- Sparse and unwritten records read as the pad value, or the previous physical record for previous-record sparse variables, instead of uninitialized memory (e.g. THEMIS `th?_fgm_*_quality`).
+
 ## [0.3.0] - 2026-10-02
 
 ### Changed

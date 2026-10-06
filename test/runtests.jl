@@ -11,6 +11,7 @@ include("cdf2_test.jl")
 include("CommonDataModelExt_test.jl")
 include("decompress_test.jl")
 include("parsing_test.jl")
+include("sparse_test.jl")
 
 @testset "Aqua" begin
     using Aqua
