@@ -1,5 +1,6 @@
 function _copy_to!(dest, doffs, src, soffs, N)
     T = eltype(dest)
+    checkbounds(src, soffs:(soffs + N * sizeof(T) - 1))
     GC.@preserve dest src begin
         src_ptr = convert(Ptr{T}, pointer(src, soffs))
         dst_ptr = pointer(dest, doffs)

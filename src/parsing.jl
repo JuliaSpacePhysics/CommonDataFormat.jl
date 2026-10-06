@@ -4,6 +4,7 @@
 # Buffer-based reading functions for zero-copy access
 # https://github.com/JuliaLang/julia/issues/31305
 @inline function read_be(v::Vector{UInt8}, i, T)
+    checkbounds(v, i:(i + sizeof(T) - 1))
     return GC.@preserve v begin
         p = convert(Ptr{T}, pointer(v, i))
         ntoh(unsafe_load(p))
@@ -53,6 +54,7 @@ end
 end
 
 @inline function write_be(v::Vector{UInt8}, i, x)
+    checkbounds(v, i:(i + sizeof(x) - 1))
     GC.@preserve v unsafe_store!(convert(Ptr{typeof(x)}, pointer(v, i)), hton(x))
     return i + sizeof(x)
 end

@@ -17,6 +17,8 @@ function VXR{FST}(source::Vector{UInt8}, offset) where {FST}
     vxr_next, pos = read_be_i(source, pos, FST)
     n_entries, pos = read_be_i(source, pos, Int32)
     n_used_entries, pos = read_be_i(source, pos, Int32)
+    checkbounds(source, pos:(pos + n_entries * (2 * sizeof(Int32) + sizeof(FST)) - 1))
+    n_used_entries <= n_entries || throw(ArgumentError("VXR uses $n_used_entries of $n_entries entries"))
     p = convert(Ptr{Int32}, pointer(source, pos))
     return VXR(vxr_next, n_entries, n_used_entries, p)
 end

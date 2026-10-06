@@ -46,3 +46,12 @@ end
     bytes = UInt8['a', 'b', 0, 0, 'c', 0, 'd', 0]
     @test CommonDataFormat._fill_strings!(Vector{String}(undef, 2), bytes, 4) == ["ab", "c\0d"]
 end
+
+# Offsets in a truncated file point past the end of the mmap; reading them must throw, not segfault.
+@testset "Truncated file" begin
+    bytes = read(data_path("ac_h0_mfi_20230102_v07.cdf"))
+    path = tempname()
+    write(path, bytes[1:(length(bytes) * 4 ÷ 5)])
+    ds = CDFDataset(path)
+    @test_throws Exception foreach(k -> Array(ds[k]), keys(ds))
+end
