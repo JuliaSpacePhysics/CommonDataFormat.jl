@@ -21,15 +21,20 @@ export is_record_varying
         return chnl
     end
 else
+    # First called inside `@threads`; unlocked, racing workers each build a pool and one
+    # deadlocks returning its decompressor to the other, already full, pool.
     const _decompressors = Ref{Union{Channel{Decompressor},Nothing}}(nothing)
+    const _decompressors_lock = ReentrantLock()
     function decompressors()
-        if _decompressors[] === nothing
-            n_ch = nthreads()
-            chnl = Channel{Decompressor}(n_ch)
-            foreach(i -> put!(chnl, Decompressor()), 1:n_ch)
-            _decompressors[] = chnl
+        @lock _decompressors_lock begin
+            if _decompressors[] === nothing
+                n_ch = nthreads()
+                chnl = Channel{Decompressor}(n_ch)
+                foreach(i -> put!(chnl, Decompressor()), 1:n_ch)
+                _decompressors[] = chnl
+            end
+            return _decompressors[]
         end
-        return _decompressors[]
     end
     __init__() = _decompressors[] = nothing
 end
