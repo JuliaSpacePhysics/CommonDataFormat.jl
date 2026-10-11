@@ -155,10 +155,15 @@ end
     @test ds["CU"][1:3] == Float32[76.23, 78.16, 81.24]
 end
 
-@testset "r-variables 2" begin
-    file = download_test_data("https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/releases/download/v0.1.8/omni2_h0_mrg1hr_20150101_v01.cdf")
-    ds = CDFDataset(file)
-    var = ds["Epoch"]
+@testset "LABL_PTR to a missing variable" begin
+    ds = CDFDataset(data_path("labl_ptr.cdf"))
+    @test ds["dangling"].attrib["LABL_PTR_1"] == "CARTESIAN"
+    @test ds["ok"].attrib["LABL_PTR_1"] == ["Bx", "By", "Bz"]
+end
+
+@testset "scalar r-variable" begin
+    ds = CDFDataset(data_path("scalar_rvar.cdf"))
+    var = ds["x"]
     @test !var.vdr.zvar
-    @test size(var) == (4344,)
+    @test var[:] == 0.0:4.0
 end

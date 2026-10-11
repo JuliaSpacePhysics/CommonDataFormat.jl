@@ -111,11 +111,12 @@ Base.haskey(la::LazyVAttrib, name) = false
 # Handle pointers like LABL_PTR_1
 # https://github.com/SciQLop/PyISTP/blob/0a565c39c73dd800934bc379dd7c2e00c28d23d0/pyistp/_impl.py#L16
 function _get_attributes(name, value, cdf)
-    if occursin("LABL_PTR", name)
-        # `Array` skips DiskArrays indexing
-        return vec(Array(cdf[value]))
-    end
-    return value
+    occursin("LABL_PTR", name) && value isa String || return value
+    vdr = find_vdr(cdf, value)
+    # Dangling pointers exist in the wild (e.g. IM_K0_EUV); keep the raw name.
+    isnothing(vdr) && return value
+    # `Array` skips DiskArrays indexing
+    return vec(Array(_variable(cdf, value, vdr)))
 end
 
 @inline function _search_aedr_entries(source, aedr_head, ::Type{RecordSizeType}, needs_byte_swap, target_varnum) where {RecordSizeType}
