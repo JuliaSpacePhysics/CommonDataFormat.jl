@@ -26,6 +26,7 @@ Base.convert(::Type{Nanosecond}, x::Picosecond) = Nanosecond(round(Int64, x.valu
 Base.convert(::Type{Picosecond}, x::Nanosecond) = Picosecond(x.value * 1.0e3)
 Base.convert(::Type{Picosecond}, x::Dates.FixedPeriod) = Picosecond(Nanosecond(x))
 Base.promote_rule(::Type{Picosecond}, ::Type{<:Dates.FixedPeriod}) = Picosecond
+Dates.tons(x::Picosecond) = x.value / 1.0e3
 
 Dates._units(x::Picosecond) = " picosecond" * (abs(value(x)) == 1 ? "" : "s")
 
@@ -83,7 +84,12 @@ function (+)(epoch::Epoch16, other::Period)
 end
 (-)(epoch::Epoch16, other::Period) = epoch + (-other)
 
-Base.isless(x::Epoch16, y::Epoch16) = isless((x.seconds, x.picoseconds), (y.seconds, y.picoseconds))
+# Range length estimate; `Dates.len` steps forward from it, so it must not overshoot by more than one.
+Dates.guess(a::TT2000, b::TT2000, c) = Int64(fld(Int128(value(b)) - value(a), tons(c)))
+Dates.guess(a::Epoch, b::Epoch, c) = floor(Int64, (b.instant - a.instant) / toms(c))
+Dates.guess(a::Epoch16, b::Epoch16, c) = floor(Int64, ((b.seconds - a.seconds) * 1.0e12 + b.picoseconds - a.picoseconds) / (1.0e3 * tons(c)))
+
+Base.isless(x::Epoch16, y::Epoch16) =isless((x.seconds, x.picoseconds), (y.seconds, y.picoseconds))
 
 # UTC nanoseconds since the Unix epoch. Int128: Epoch16 spans years 0-9999 and TT2000 reaches
 # 2292, both beyond an Int64 nanosecond count.

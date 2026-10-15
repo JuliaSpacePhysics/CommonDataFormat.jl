@@ -99,6 +99,18 @@ end
     end
 end
 
+@testset "StepRange" begin
+    t0, t1 = DateTime(2020), DateTime(2020, 1, 1, 0, 22)
+    for T in (Epoch, Epoch16, TT2000)
+        r = T(t0):Minute(5):T(t1)
+        @test length(r) == 5
+        @test last(r) == T(t0 + Minute(20))
+        @test T(t0 + Minute(10)) in r
+        @test collect(T(t1):Minute(-5):T(t0)) == T.(t1:Minute(-5):t0)
+    end
+    @test length(TT2000(t0):Nanosecond(1):(TT2000(t0) + Nanosecond(5))) == 6
+end
+
 @testset "FILLVAL" begin
     @test string(TT2000(typemin(Int64))) == "FILLVAL"
     @test string(Epoch16(-1.0e31, -1.0e31)) == "FILLVAL"
