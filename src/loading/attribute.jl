@@ -69,8 +69,7 @@ function Base.iterate(la::LazyVAttrib, offset::Int = Int(la.cdf.gdr.ADRhead))
         next_offset = Int(adr.ADRnext)
         found = _search_aedr_entries(buffer, _entry_head(la, adr), RecordSizeType, needs_byte_swap, la.varnum)
         if !isnothing(found)
-            name = adr_name(buffer, adr)
-            return (name => _get_attributes(name, found, la.cdf), next_offset)
+            return (adr_name(buffer, adr) => found, next_offset)
         end
         offset = next_offset
     end
@@ -98,7 +97,7 @@ function Base.get(la::LazyVAttrib, name::AbstractString, default = nothing)
         name_equals(buffer, _adr_name_pos(offset, RecordSizeType), name_str, RecordSizeType) || continue
         adr = ADR{RecordSizeType}(buffer, offset)
         found = _search_aedr_entries(buffer, _entry_head(la, adr), RecordSizeType, needs_byte_swap, varnum)
-        return isnothing(found) ? default : _get_attributes(name, found, cdf)
+        return isnothing(found) ? default : found
     end
     return default
 end
@@ -107,17 +106,6 @@ Base.get(la::LazyVAttrib, name, default = nothing) = default
 
 Base.haskey(la::LazyVAttrib, name::AbstractString) = !isnothing(get(la, name, nothing))
 Base.haskey(la::LazyVAttrib, name) = false
-
-# Handle pointers like LABL_PTR_1
-# https://github.com/SciQLop/PyISTP/blob/0a565c39c73dd800934bc379dd7c2e00c28d23d0/pyistp/_impl.py#L16
-function _get_attributes(name, value, cdf)
-    occursin("LABL_PTR", name) && value isa String || return value
-    vdr = find_vdr(cdf, value)
-    # Dangling pointers exist in the wild (e.g. IM_K0_EUV); keep the raw name.
-    isnothing(vdr) && return value
-    # `Array` skips DiskArrays indexing
-    return vec(Array(_variable(cdf, value, vdr)))
-end
 
 @inline function _search_aedr_entries(source, aedr_head, ::Type{RecordSizeType}, needs_byte_swap, target_varnum) where {RecordSizeType}
     aedr_head == 0 && return nothing

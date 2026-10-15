@@ -155,12 +155,6 @@ end
     @test ds["CU"][1:3] == Float32[76.23, 78.16, 81.24]
 end
 
-@testset "LABL_PTR to a missing variable" begin
-    ds = CDFDataset(data_path("labl_ptr.cdf"))
-    @test ds["dangling"].attrib["LABL_PTR_1"] == "CARTESIAN"
-    @test ds["ok"].attrib["LABL_PTR_1"] == ["Bx", "By", "Bz"]
-end
-
 @testset "scalar r-variable" begin
     ds = CDFDataset(data_path("scalar_rvar.cdf"))
     var = ds["x"]

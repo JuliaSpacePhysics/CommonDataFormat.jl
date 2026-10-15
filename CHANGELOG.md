@@ -4,11 +4,19 @@
 
 ### Changed
 
-- **Breaking**: `CDF_CHAR`/`CDF_UCHAR` variables have eltype `String` (trailing null padding stripped); `StaticString` is removed. Avoids a recompile for each new string width ([#79]).
+- **Breaking**: variable attributes are returned as stored: `LABL_PTR_i` is the label variable's name, no longer resolved to its labels (ISTP conventions live in CDFDatasets). `fillvalue` moved to CDFDatasets.
+
+## [0.4.2] - 2026-10-06
 
 ### Fixed
 
-- Sparse and unwritten records read as the pad value, or the previous physical record for previous-record sparse variables, instead of uninitialized memory (e.g. THEMIS `th?_fgm_*_quality`).
+- Sparse and unwritten records read as the pad value, or the previous physical record for previous-record sparse variables, instead of uninitialized memory.
+
+## [0.4.0] - 2026-10-06
+
+### Changed
+
+- **Breaking**: `CDF_CHAR`/`CDF_UCHAR` variables have eltype `String` (trailing null padding stripped); `StaticString` is removed. Avoids a recompile for each new string width ([#79]).
 
 ## [0.3.0] - 2026-10-02
 
@@ -33,7 +41,9 @@
 
 - **Breaking**: Renamed exported enum `DataType` to `CDFDataType` ([#46]) as the old name collided with `Base.DataType`.
 
-[Unreleased]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/compare/v0.4.5...HEAD
+[0.4.2]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/compare/v0.4.1...v0.4.2
+[0.4.0]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/compare/v0.3.2...v0.4.0
 [0.3.0]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/releases/tag/v0.2.0
 
