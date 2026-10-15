@@ -89,10 +89,6 @@ end
 
 const cdf_magic_bytes = (0xCDF30001, 0xCDF26002, 0x0000FFFF) # CDF format uses different magic numbers: CDF3.0, CDF2.x versions
 
-function validate_cdf_magic(magic_bytes)
-    return magic_bytes in cdf_magic_bytes
-end
-
 # Big-endian files: swap each `unit`-byte word in place (0 = raw bytes, no swap).
 _swap_unit(::Type{T}) where {T} = sizeof(T)
 _swap_unit(::Type{Epoch16}) = 8  # two Float64s
