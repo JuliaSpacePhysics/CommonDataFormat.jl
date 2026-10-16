@@ -100,6 +100,7 @@ _unix_ns(dt::TimeType) = (Int128(value(DateTime(dt))) - Dates.UNIXEPOCH) * 1_000
 
 # Int128 division is a slow library call, and nearly every instant fits an Int64.
 _fld(ns::Int128, d::Int64) = typemin(Int64) <= ns <= typemax(Int64) ? fld(ns % Int64, d) : Int64(fld(ns, d))
+_mod(ns::Int128, d::Int64) = typemin(Int64) <= ns <= typemax(Int64) ? mod(ns % Int64, d) : Int64(mod(ns, d))
 
 # Floored to the millisecond, so calendar fields never run ahead of the instant.
 Dates.DateTime(x::Union{TT2000, Epoch16}) = DateTime(Dates.UTM(_fld(_unix_ns(x), 1_000_000) + Dates.UNIXEPOCH))
@@ -111,19 +112,12 @@ Base.convert(::Type{Timestamp{P}}, x::Union{TT2000, Epoch16}) where {P} = conver
 Base.convert(::Type{Timestamp{P}}, x::Epoch) where {P} = convert(Timestamp{P}, DateTime(x))
 Base.convert(::Type{DateTime}, x::CDFDateTime) = DateTime(x)
 
-# Calendar fields and printing. Epoch and Epoch16 span years 0-9999, far beyond
-# Timestamp{Nanosecond} (1677-2262), so only TT2000 gets nanosecond fields.
-_calendar(x::TT2000) = Timestamp{Nanosecond}(x)
-_calendar(x::CDFDateTime) = DateTime(x)
-
 TT2000(dt::TimeType) = convert(TT2000, dt)
 Epoch(dt::TimeType) = convert(Epoch, dt)
 Epoch16(dt::TimeType) = convert(Epoch16, dt)
 
-function Base.convert(::Type{TT2000}, dt::TimeType)
-    ns_since_unix = _unix_ns(dt)
-    return TT2000(Int64(ns_since_unix - TT2000_OFFSET + leap_second(ns_since_unix)))
-end
+Base.convert(::Type{TT2000}, dt::TimeType) = _tt2000(_unix_ns(dt))
+_tt2000(ns_since_unix) = TT2000(Int64(ns_since_unix - TT2000_OFFSET + leap_second(ns_since_unix)))
 
 function Base.convert(::Type{Epoch16}, dt::TimeType)
     s, ns = fldmod(_unix_ns(dt), 1_000_000_000)
@@ -146,11 +140,11 @@ for t in (:Epoch, :Epoch16, :TT2000)
 end
 
 for f in (:Date, :Time, :days, :year, :month, :day, :hour, :minute, :second, :millisecond)
-    @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(_calendar(epoch))
+    @eval Dates.$f(epoch::CDFDateTime) = Dates.$f(DateTime(epoch))
 end
-for f in (:microsecond, :nanosecond)
-    @eval Dates.$f(epoch::TT2000) = Dates.$f(_calendar(epoch))
-end
+Dates.Time(x::TT2000) = Time(Nanosecond(_mod(_unix_ns(x), 86_400_000_000_000)))
+Dates.microsecond(x::TT2000) = _mod(_unix_ns(x), 1_000_000) ÷ 1000
+Dates.nanosecond(x::TT2000) = _mod(_unix_ns(x), 1000)
 
 # Callers guarantee `r` is in bounds.
 @inline function _parse_int(b, r)
@@ -196,11 +190,23 @@ Dates.value(epoch::Epoch) = epoch.instant
 Dates.value(epoch::Epoch16) = ComplexF64(epoch.seconds, epoch.picoseconds)
 Dates.value(epoch::TT2000) = epoch.instant.value
 
-function Base.floor(x::T, p::Union{DatePeriod, TimePeriod}) where {T <: CDFDateTime}
-    return convert(T, floor(_calendar(x), p))
+Base.floor(x::T, p::Union{DatePeriod, TimePeriod}) where {T <: CDFDateTime} = convert(T, floor(DateTime(x), p))
+# On the grid of `floor(::Timestamp, p)`
+function Base.floor(x::TT2000, p::TimePeriod)
+    ns = _unix_ns(x)
+    return _tt2000(ns - mod(ns + _FLOOR_EPOCH_NS, tons(p)))
 end
+const _FLOOR_EPOCH_NS = Int128(Dates.UNIXEPOCH - Dates.DATEEPOCH * 86_400_000) * 1_000_000
 
-Base.show(io::IO, epoch::CDFDateTime) = _isfill(epoch) ? print(io, "FILLVAL") : print(io, _calendar(epoch))
+Base.show(io::IO, epoch::CDFDateTime) = _isfill(epoch) ? print(io, "FILLVAL") : print(io, DateTime(epoch))
+function Base.show(io::IO, x::TT2000)
+    _isfill(x) && return print(io, "FILLVAL")
+    ns = _unix_ns(x)
+    print(io, DateTime(Dates.UTM(_fld(ns, 1_000_000_000) * 1000 + Dates.UNIXEPOCH)))
+    f = _mod(ns, 1_000_000_000)
+    iszero(f) || print(io, '.', rstrip(string(f; pad = 9), '0'))
+    return
+end
 
 # Promote towards the CDF type: UTC -> TT2000 is injective, whereas TT2000 -> UTC folds each
 # inserted leap second onto the following second, so comparing in UTC would equate distinct instants.

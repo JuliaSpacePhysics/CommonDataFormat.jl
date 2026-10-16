@@ -92,6 +92,12 @@ end
     @test DateTime(TT2000(DateTime(2291))) == DateTime(2291)
     @test_throws InexactError TT2000(DateTime(2300))
     @test DateTime(TT2000(typemin(Int64) + 1)) == DateTime("1707-09-22T12:12:10.961")
+    x = TT2000(typemax(Int64))
+    @test string(x) == "2292-04-11T11:46:07.670775807"
+    @test TT2000(string(x)) == x
+    @test (year(x), Dates.microsecond(x), Dates.nanosecond(x)) == (2292, 775, 807)
+    @test Time(x) == Time(11, 46, 7, 670, 775, 807)
+    @test floor(x, Microsecond(1)) == x - Nanosecond(807)
 
     # Epoch16 spans years 0-9999, beyond Timestamp{Nanosecond}
     for dt in (DateTime(0), DateTime(9999, 12, 31, 23, 59, 59, 999))
