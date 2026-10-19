@@ -200,6 +200,15 @@ function _covers(entries, rec_range)
     return r > last(rec_range)
 end
 
+function _with_decompressor(f)
+    decompressor = take!(decompressors())
+    try
+        return f(decompressor)
+    finally
+        put!(decompressors(), decompressor)
+    end
+end
+
 # Fill `dest` (exactly `nrec * record_bytes` bytes) with records `rec_first:rec_last`.
 # Element-type agnostic so the (threaded) decompression loop compiles once.
 function _read_records!(dest::Vector{UInt8}, buffer::Vector{UInt8}, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, record_bytes::Int, compression::CompressionType, ::Type{RST}, virtual::VirtualRecords) where {RST}
@@ -210,13 +219,18 @@ function _read_records!(dest::Vector{UInt8}, buffer::Vector{UInt8}, entries::Vec
             _read_entry!(dest, buffer, entries[i], rec_first, rec_last, record_bytes, compression, RST, nothing)
         end
     else
-        Threads.@threads for i in start_idx:end_idx
-            decompressor = take!(decompressors())
-            try
+        next = Threads.Atomic{Int}(start_idx)
+        work() = _with_decompressor() do decompressor
+            while (i = Threads.atomic_add!(next, 1)) <= end_idx
                 _read_entry!(dest, buffer, entries[i], rec_first, rec_last, record_bytes, compression, RST, decompressor)
-            finally
-                put!(decompressors(), decompressor)
             end
+        end
+        nworkers = length(dest) >= 1 << 20 ? min(end_idx - start_idx + 1, nthreads()) : 1
+        tasks = [Threads.@spawn(work()) for _ in 2:nworkers]
+        try
+            work()
+        finally
+            foreach(wait, tasks)
         end
     end
     r = rec_first
@@ -236,11 +250,8 @@ function _fill_virtual!(dest, buffer, entries, prev_idx, skip, n, record_bytes, 
         if compression == NoCompression
             _read_entry!(record, buffer, e, e.last, e.last, record_bytes, compression, RST, nothing)
         else
-            decompressor = take!(decompressors())
-            try
+            _with_decompressor() do decompressor
                 _read_entry!(record, buffer, e, e.last, e.last, record_bytes, compression, RST, decompressor)
-            finally
-                put!(decompressors(), decompressor)
             end
         end
     else
