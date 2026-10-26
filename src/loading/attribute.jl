@@ -2,9 +2,14 @@
 # Handles loading of ADR (Attribute Descriptor Record) and AEDR (Attribute Entry Descriptor Record) chains
 
 # Load all attribute entries for a given attribute from its AEDRs: rEntries, then zEntries.
+# Writers may chain AEDRs out of entry-number order, so each chain is ordered by entry number.
 @inline function load_attribute_entries(buffer::Vector{UInt8}, adr, ::Type{RecordSizeType}, needs_byte_swap) where {RecordSizeType}
-    load(head) = map(OffsetsIterator{RecordSizeType}(buffer, head)) do offset
-        load_aedr_data(buffer, offset, RecordSizeType, needs_byte_swap)
+    function load(head)
+        offsets = OffsetsIterator{RecordSizeType}(buffer, head)
+        entries = map(offset -> load_aedr_data(buffer, offset, RecordSizeType, needs_byte_swap), offsets)
+        nums = Iterators.map(offset -> aedr_num(buffer, offset, RecordSizeType), offsets)
+        length(entries) < 2 || issorted(nums) || permute!(entries, sortperm(collect(nums)))
+        return entries
     end
     adr.AzEDRhead == 0 && return load(adr.AgrEDRhead)
     adr.AgrEDRhead == 0 && return load(adr.AzEDRhead)
@@ -110,10 +115,8 @@ Base.haskey(la::LazyVAttrib, name) = false
 @inline function _search_aedr_entries(source, aedr_head, ::Type{RecordSizeType}, needs_byte_swap, target_varnum) where {RecordSizeType}
     aedr_head == 0 && return nothing
     offset = Int(aedr_head)
-    _num_offset = 13 + 2 * sizeof(RecordSizeType)
     while offset != 0
-        num = read_be(source, offset + _num_offset, Int32)
-        if num == target_varnum
+        if aedr_num(source, offset, RecordSizeType) == target_varnum
             return load_aedr_data(source, offset, RecordSizeType, needs_byte_swap)
         end
         offset = next_record_offset(source, offset, RecordSizeType)

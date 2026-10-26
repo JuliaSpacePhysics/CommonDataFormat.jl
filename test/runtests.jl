@@ -155,6 +155,12 @@ end
     @test ds["CU"][1:3] == Float32[76.23, 78.16, 81.24]
 end
 
+@testset "global entries chained out of entry-number order" begin
+    file = download_test_data("https://cdaweb.gsfc.nasa.gov/pub/software/cdawlib/0MASTERS/new-horizons_pepssi_triples-diff-intensity-bflux-b_00000000_v01.cdf")
+    ds = CDFDataset(file)
+    @test ds.attrib["TEXT"][(end - 3):(end - 2)] == ["The original datafiles:", "PEPSSI_Reduced_BFLUX_NNNN_M.csv"]
+end
+
 @testset "scalar r-variable" begin
     ds = CDFDataset(data_path("scalar_rvar.cdf"))
     var = ds["x"]
