@@ -78,7 +78,7 @@ function _majority_swap!(data::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, nrec::I
 end
 
 # Extract `ranges` of the record dims (all records) from contiguous column-major `src`.
-function _copy_subblock!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, ranges::Vector{UnitRange{Int}}, nrec::Int)
+function _copy_subregion!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, ranges::Vector{UnitRange{Int}}, nrec::Int)
     k = length(rdims)
     sstrides = Vector{Int}(undef, k + 1)
     s = esz
@@ -94,29 +94,35 @@ function _copy_subblock!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, rdims::Vect
     return
 end
 
-function DiskArrays.readblock!(var::CDFVariable{T,N}, dest::AbstractArray{T}, ranges::Vararg{AbstractUnitRange{<:Integer},N}) where {T,N}
-    N > 0 && @boundscheck checkbounds(var, ranges...)
+function _check_region(var, dest, ranges)
+    all(map(issubset, ranges, axes(var))) || throw(BoundsError(var, ranges))
+    length(dest) == prod(map(length, ranges); init = 1) || throw(DimensionMismatch("destination of length $(length(dest)) for a region of size $(map(length, ranges))"))
+    return
+end
+
+function Base.read!(var::CDFVariable{T,N}, dest::AbstractArray{T}, ranges::Vararg{AbstractUnitRange{<:Integer},N}) where {T,N}
+    _check_region(var, dest, ranges)
     isempty(dest) && return dest
     if !(dest isa Array)
-        copyto!(dest, DiskArrays.readblock!(var, Array{T}(undef, size(dest)), ranges...))
+        copyto!(dest, read!(var, Array{T}(undef, size(dest)), ranges...))
         return dest
     end
-    GC.@preserve dest _readblock!(Ptr{UInt8}(_ptr(dest)), sizeof(T), _block_args(var, ranges)..., var.vdr, var.parentdataset)
+    GC.@preserve dest _read_region!(Ptr{UInt8}(_ptr(dest)), sizeof(T), _region_args(var, ranges)..., var)
     is_big_endian_encoding(var) && _byte_swap!(dest)
     return dest
 end
 
 # CHAR elements are `num_elems`-byte fields, null-padded; the string ends at the trailing-null run.
-function DiskArrays.readblock!(var::CDFVariable{String,N}, dest::AbstractArray{String}, ranges::Vararg{AbstractUnitRange{<:Integer},N}) where {N}
-    N > 0 && @boundscheck checkbounds(var, ranges...)
+function Base.read!(var::CDFVariable{String,N}, dest::AbstractArray{String}, ranges::Vararg{AbstractUnitRange{<:Integer},N}) where {N}
+    _check_region(var, dest, ranges)
     isempty(dest) && return dest
     if !(dest isa Array)
-        copyto!(dest, DiskArrays.readblock!(var, Array{String}(undef, size(dest)), ranges...))
+        copyto!(dest, read!(var, Array{String}(undef, size(dest)), ranges...))
         return dest
     end
     w = Int(var.vdr.num_elems)
     bytes = Vector{UInt8}(undef, w * length(dest))
-    GC.@preserve bytes _readblock!(pointer(bytes), w, _block_args(var, ranges)..., var.vdr, var.parentdataset)
+    GC.@preserve bytes _read_region!(pointer(bytes), w, _region_args(var, ranges)..., var)
     _fill_strings!(vec(dest), bytes, w)
     return dest
 end
@@ -133,16 +139,21 @@ function _fill_strings!(dest::Vector{String}, bytes::Vector{UInt8}, w::Int)
     return dest
 end
 
-function _block_args(var::CDFVariable, ranges)
+function _region_args(var::CDFVariable, ranges)
     rdims = Int[Base.front(var.dims)...]
     other_ranges = UnitRange{Int}[Int(first(r)):Int(last(r)) for r in Base.front(ranges)]
     rec_range = Int(first(ranges[end])):Int(last(ranges[end]))
     return rdims, other_ranges, rec_range
 end
 
-function _readblock!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_ranges::Vector{UnitRange{Int}}, rec_range::UnitRange{Int}, vdr, ds)
+function _read_region!(dest, esz, rdims, other_ranges, rec_range, var::CDFVariable)
+    vdr, ds = var.vdr, var.parentdataset
     entries = read_vvrs(vdr, ds)
     compression = any(e -> e.compressed, entries) ? variable_compression(vdr, ds) : NoCompression
+    return _read_region!(dest, esz, rdims, other_ranges, rec_range, vdr, ds, entries, compression)
+end
+
+function _read_region!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_ranges::Vector{UnitRange{Int}}, rec_range::UnitRange{Int}, vdr, ds, entries::Vector{VVREntry}, compression::CompressionType)
     virtual = _covers(entries, rec_range) ? NO_VIRTUAL : VirtualRecords(vdr.s_records == 2, pad_bytes(vdr, ds, esz))
     buffer = parent(ds)
     RST = recordsize_type(ds)
@@ -158,23 +169,16 @@ function _readblock!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_range
         GC.@preserve scratch begin
             _read_records!(scratch, buffer, entries, first(rec_range), last(rec_range), record_bytes, compression, RST, virtual)
             swap && _majority_swap!(pointer(scratch), esz, rdims, nrec)
-            _copy_subblock!(dest, pointer(scratch), esz, rdims, other_ranges, nrec)
+            _copy_subregion!(dest, pointer(scratch), esz, rdims, other_ranges, nrec)
         end
     end
     return
 end
 
-# Whole-variable reads skip DiskArrays' indexing layer, which is costly to compile
-function Base.Array(var::CDFVariable{T,N}) where {T,N}
-    dest = Array{T,N}(undef, size(var))
-    DiskArrays.readblock!(var, dest, axes(var)...)
-    return dest
-end
-
 function _record(var::CDFVariable{T,N}, r::Int) where {T,N}
     rdims = Base.front(var.dims)
     dest = Array{T,N}(undef, rdims..., 1)
-    DiskArrays.readblock!(var, dest, ntuple(i -> 1:rdims[i], N - 1)..., r:r)
+    read!(var, dest, ntuple(i -> 1:rdims[i], N - 1)..., r:r)
     return dest
 end
 
@@ -189,10 +193,14 @@ end
 
 const NO_VIRTUAL = VirtualRecords(false, UInt8[])
 
+# Entries are sorted and disjoint, so both `first` and `last` increase
+_entry_first(x) = x isa VVREntry ? x.first : x
+_entry_last(x) = x isa VVREntry ? x.last : x
+
 function _covers(entries, rec_range)
     r = first(rec_range)
-    for e in entries
-        e.last < r && continue
+    for i in searchsortedfirst(entries, r; by = _entry_last):lastindex(entries)
+        e = entries[i]
         e.first > r && return false
         r = e.last + 1
         r > last(rec_range) && return true
@@ -212,8 +220,8 @@ end
 # Fill `dest` (exactly `nrec * record_bytes` bytes) with records `rec_first:rec_last`.
 # Element-type agnostic so the (threaded) decompression loop compiles once.
 function _read_records!(dest::Vector{UInt8}, buffer::Vector{UInt8}, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, record_bytes::Int, compression::CompressionType, ::Type{RST}, virtual::VirtualRecords) where {RST}
-    start_idx = something(findfirst(e -> e.last >= rec_first, entries), length(entries) + 1)
-    end_idx = something(findlast(e -> e.first <= rec_last, entries), 0)
+    start_idx = searchsortedfirst(entries, rec_first; by = _entry_last)
+    end_idx = searchsortedlast(entries, rec_last; by = _entry_first)
     if compression == NoCompression
         for i in start_idx:end_idx
             _read_entry!(dest, buffer, entries[i], rec_first, rec_last, record_bytes, compression, RST, nothing)

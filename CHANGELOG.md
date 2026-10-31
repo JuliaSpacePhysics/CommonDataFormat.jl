@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking**: `CDFVariable` is a handle on a file variable, no longer an array. Index or call `Array(var)` to read; `read!(var, dest, ranges...)`.
+
 ## [0.5.0] - 2026-10-15
 
 ### Changed

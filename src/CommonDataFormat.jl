@@ -2,7 +2,6 @@ module CommonDataFormat
 
 using Dates
 using Mmap
-using DiskArrays
 using Base.Threads
 using LibDeflate
 using PrecompileTools

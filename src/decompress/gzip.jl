@@ -41,3 +41,5 @@ else
         return Int(uncompressed_size)
     end
 end
+
+_unsafe_gzip_decompress!(::Nothing, args...) = _with_decompressor(d -> _unsafe_gzip_decompress!(d, args...))
