@@ -21,8 +21,6 @@ full_load(fname) = map(Array, CDFDataset(fname))
 let ds = CDFDataset(ELX_FILE), var = ds["elb_pef_hs_Epat_eflux"]
     g = SUITE["elx"] = BenchmarkGroup()
     g["sum_array"] = @benchmarkable sum(Array($var))
-    g["sum_lazy"] = @benchmarkable sum($var)
-    g["sum_var_access"] = @benchmarkable sum($ds["elb_pef_hs_Epat_eflux"])
     g["full_load"] = @benchmarkable full_load(ELX_FILE)
 end
 
@@ -33,11 +31,8 @@ let ds = CDFDataset(MMS_FILE), var = ds["mms1_scm_acb_gse_scsrvy_srvy_l2"]
     g["sum_var_access"] = @benchmarkable sum($var[:, 100:100000])
     g["full_load"] = @benchmarkable full_load(MMS_FILE)
     # One compressed block holds ~5400 records, so these read within one block.
+    g["index_element"] = @benchmarkable $var[2, 1_000_000]
     g["index_small_slice"] = @benchmarkable $var[:, 1_000_000:1_000_100]
-    g["view_index"] = @benchmarkable view($var, :, 1:1_000_000)[:, 500_000:500_100]
-    g["transpose_view"] = @benchmarkable Matrix(transpose(view($var, :, 1_000_000:1_000_500)))
-    # In-place so result is computed
-    g["broadcast"] = @benchmarkable dest .= view($var, :, 1:100_000) .* 2.0f0 setup = (dest = Matrix{Float32}(undef, 3, 100_000))
 end
 
 # Inputs stay within what every epoch type could always represent (millisecond strings, modern
