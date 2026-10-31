@@ -18,9 +18,11 @@ include("sparse_test.jl")
     Aqua.test_all(CommonDataFormat)
 end
 
-@testset "JET" begin
-    using JET
-    JET.test_package(CommonDataFormat; target_modules = [CommonDataFormat])
+if isempty(VERSION.prerelease)
+    @testset "JET" begin
+        using JET
+        JET.test_package(CommonDataFormat; target_modules = [CommonDataFormat])
+    end
 end
 
 @testset "Trim" begin
