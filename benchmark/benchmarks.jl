@@ -16,7 +16,7 @@ function download_data(url, filename = basename(url))
 end
 
 const MMS_FILE = download_data("https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/releases/download/v0.1.16/mms1_scm_srvy_l2_scsrvy_20190301_v2.2.0.cdf")
-full_load(fname) = collect(CDFDataset(fname))
+full_load(fname) = map(Array, CDFDataset(fname))
 
 let ds = CDFDataset(ELX_FILE), var = ds["elb_pef_hs_Epat_eflux"]
     g = SUITE["elx"] = BenchmarkGroup()
