@@ -171,9 +171,10 @@ const EXPECTED_GLOBAL_ATTRIBUTES = Dict{String, Any}(
         @test CDF.attrib(ds, attr_name) == expected_value
         @test attribs[attr_name] == expected_value
     end
+    @test first.(collect(attribs)) == CDF.attribnames(ds)
 end
 
-@testset "LazyVAttrib haskey key types" begin
+@testset "LazyAttrib haskey key types" begin
     var = ds["var"]
     la = var.attrib
     @test haskey(la, "DEPEND0")        # String — present

@@ -38,8 +38,7 @@ end
     la = ds["label_BGSE"].attrib
     @test la["FIELDNAM"] == "Label for B in Cartesian GSE"
     @test !haskey(la, "FILLVAL")
-    @test Dict(la)["VAR_TYPE"] == "metadata"
-    @test length(ds.vattrib["FIELDNAM"]) == length(ds)
+    @test la["VAR_TYPE"] == "metadata"
 end
 
 @testset "CHAR null padding" begin
