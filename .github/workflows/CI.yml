@@ -15,7 +15,7 @@ jobs:
   test:
     uses: JuliaSpacePhysics/actions/.github/workflows/julia-ci.yml@main
     with:
-      versions: '["1", "lts", "pre"]'
+      versions: '["1", "min", "pre"]'
     permissions:
       actions: write
       contents: read

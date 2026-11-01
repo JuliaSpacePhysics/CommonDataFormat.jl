@@ -44,6 +44,7 @@ struct CDFDataset{FST}
     buffer::Vector{UInt8}
     compression::CompressionType
     id::Int
+    record_index::Base.Lockable{Dict{Int,Tuple{Vector{VVREntry},CompressionType}},ReentrantLock}
 end
 
 Base.parent(cdf::CDFDataset) = getfield(cdf, :buffer)
@@ -86,7 +87,7 @@ function CDFDataset{FST}(fname, buffer) where {FST}
     end
     cdr = CDR{FST}(buffer, 8)
     gdr = GDR{FST}(buffer, Int(cdr.gdr_offset))
-    return CDFDataset{FST}(fname, cdr, gdr, buffer, compression, Threads.atomic_add!(DATASET_IDS, 1))
+    return CDFDataset{FST}(fname, cdr, gdr, buffer, compression, Threads.atomic_add!(DATASET_IDS, 1), Base.Lockable(Dict{Int,Tuple{Vector{VVREntry},CompressionType}}()))
 end
 
 Base.close(cdf::CDFDataset) = (evict_dataset!(BLOCK_CACHE, dataset_id(cdf)); finalize(parent(cdf)); nothing)

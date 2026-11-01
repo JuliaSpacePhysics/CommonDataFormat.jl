@@ -146,11 +146,18 @@ function _region_args(var::CDFVariable, ranges)
     return rdims, other_ranges, rec_range
 end
 
+function record_index(vdr, ds::CDFDataset)
+    return lock(getfield(ds, :record_index)) do index
+        get!(index, Int(vdr.vxr_head)) do
+            entries = read_vvrs(vdr, ds)
+            (entries, any(e -> e.compressed, entries) ? variable_compression(vdr, ds) : NoCompression)
+        end
+    end
+end
+
 function _read_region!(dest, esz, rdims, other_ranges, rec_range, var::CDFVariable)
     vdr, ds = var.vdr, var.parentdataset
-    entries = read_vvrs(vdr, ds)
-    compression = any(e -> e.compressed, entries) ? variable_compression(vdr, ds) : NoCompression
-    return _read_region!(dest, esz, rdims, other_ranges, rec_range, vdr, ds, entries, compression)
+    return _read_region!(dest, esz, rdims, other_ranges, rec_range, vdr, ds, record_index(vdr, ds)...)
 end
 
 function _read_region!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_ranges::Vector{UnitRange{Int}}, rec_range::UnitRange{Int}, vdr, ds::CDFDataset, entries::Vector{VVREntry}, compression::CompressionType)
