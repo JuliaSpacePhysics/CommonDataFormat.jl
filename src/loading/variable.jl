@@ -158,17 +158,13 @@ function _read_region!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_ran
     swap = majority(ds) == Row
     nrec = length(rec_range)
     record_bytes = prod(rdims) * esz
-    if length.(other_ranges) == rdims
-        dest_vec = unsafe_wrap(Vector{UInt8}, dest, nrec * record_bytes)
-        _read_records!(dest_vec, ds, entries, first(rec_range), last(rec_range), record_bytes, compression, virtual)
-        swap && _majority_swap!(dest, esz, rdims, nrec)
-    else
-        scratch = Vector{UInt8}(undef, nrec * record_bytes)
-        GC.@preserve scratch begin
-            _read_records!(scratch, ds, entries, first(rec_range), last(rec_range), record_bytes, compression, virtual)
-            swap && _majority_swap!(pointer(scratch), esz, rdims, nrec)
-            _copy_subregion!(dest, pointer(scratch), esz, rdims, other_ranges, nrec)
-        end
+    whole_records = length.(other_ranges) == rdims
+    nbytes = nrec * record_bytes
+    buf = whole_records ? unsafe_wrap(Vector{UInt8}, dest, nbytes) : Vector{UInt8}(undef, nbytes)
+    GC.@preserve buf begin
+        _read_records!(buf, ds, entries, first(rec_range), last(rec_range), record_bytes, compression, virtual)
+        swap && _majority_swap!(pointer(buf), esz, rdims, nrec)
+        whole_records || _copy_subregion!(dest, pointer(buf), esz, rdims, other_ranges, nrec)
     end
     return
 end

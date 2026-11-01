@@ -124,10 +124,7 @@ end
 # 2 Whether or not a compression method might be applied to this variable data. Set indicates that a compression is chosen by the user and the data might be compressed, depending on the data size and content. If the compressed data becomes larger than its uncompressed data, no compression is applied and the data are stored as uncompressed, even the compression bit is set. The compressed data is stored in Compressed Variable Value Record (CVVR) while uncompressed data go into Variable Value Record (VVR). Clear indicates that a compression will not be used. The CPRorSPRoffset field provides the offset of the Compressed Parameters Record if this compression bit is set and the compression used.
 
 function read_vvrs(vdr::VDR{FieldSizeT}, cdf) where {FieldSizeT}
-    entries = Vector{VVREntry}()
-    sizehint!(entries, 1)
-    collect_vxr_entries!(entries, parent(cdf), Int(vdr.vxr_head), FieldSizeT)
-    return entries
+    return collect_vxr_entries!(VVREntry[], parent(cdf), Int(vdr.vxr_head), FieldSizeT)
 end
 
 is_record_varying(vdr) = !is_nrv(vdr)
