@@ -153,21 +153,19 @@ function _read_region!(dest, esz, rdims, other_ranges, rec_range, var::CDFVariab
     return _read_region!(dest, esz, rdims, other_ranges, rec_range, vdr, ds, entries, compression)
 end
 
-function _read_region!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_ranges::Vector{UnitRange{Int}}, rec_range::UnitRange{Int}, vdr, ds, entries::Vector{VVREntry}, compression::CompressionType)
+function _read_region!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_ranges::Vector{UnitRange{Int}}, rec_range::UnitRange{Int}, vdr, ds::CDFDataset, entries::Vector{VVREntry}, compression::CompressionType)
     virtual = _covers(entries, rec_range) ? NO_VIRTUAL : VirtualRecords(vdr.s_records == 2, pad_bytes(vdr, ds, esz))
-    buffer = parent(ds)
-    RST = recordsize_type(ds)
     swap = majority(ds) == Row
     nrec = length(rec_range)
     record_bytes = prod(rdims) * esz
     if length.(other_ranges) == rdims
         dest_vec = unsafe_wrap(Vector{UInt8}, dest, nrec * record_bytes)
-        _read_records!(dest_vec, buffer, entries, first(rec_range), last(rec_range), record_bytes, compression, RST, virtual)
+        _read_records!(dest_vec, ds, entries, first(rec_range), last(rec_range), record_bytes, compression, virtual)
         swap && _majority_swap!(dest, esz, rdims, nrec)
     else
         scratch = Vector{UInt8}(undef, nrec * record_bytes)
         GC.@preserve scratch begin
-            _read_records!(scratch, buffer, entries, first(rec_range), last(rec_range), record_bytes, compression, RST, virtual)
+            _read_records!(scratch, ds, entries, first(rec_range), last(rec_range), record_bytes, compression, virtual)
             swap && _majority_swap!(pointer(scratch), esz, rdims, nrec)
             _copy_subregion!(dest, pointer(scratch), esz, rdims, other_ranges, nrec)
         end
@@ -218,19 +216,19 @@ function _with_decompressor(f)
 end
 
 # Fill `dest` (exactly `nrec * record_bytes` bytes) with records `rec_first:rec_last`.
-# Element-type agnostic so the (threaded) decompression loop compiles once.
-function _read_records!(dest::Vector{UInt8}, buffer::Vector{UInt8}, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, record_bytes::Int, compression::CompressionType, ::Type{RST}, virtual::VirtualRecords) where {RST}
+# Element-type agnostic so decompression loop compiles once per record-size type.
+function _read_records!(dest::Vector{UInt8}, ds::CDFDataset, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, record_bytes::Int, compression::CompressionType, virtual::VirtualRecords)
     start_idx = searchsortedfirst(entries, rec_first; by = _entry_last)
     end_idx = searchsortedlast(entries, rec_last; by = _entry_first)
     if compression == NoCompression
         for i in start_idx:end_idx
-            _read_entry!(dest, buffer, entries[i], rec_first, rec_last, record_bytes, compression, RST, nothing)
+            _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression, nothing)
         end
     else
         next = Threads.Atomic{Int}(start_idx)
         work() = _with_decompressor() do decompressor
             while (i = Threads.atomic_add!(next, 1)) <= end_idx
-                _read_entry!(dest, buffer, entries[i], rec_first, rec_last, record_bytes, compression, RST, decompressor)
+                _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression, decompressor)
             end
         end
         nworkers = length(dest) >= 1 << 20 ? min(end_idx - start_idx + 1, nthreads()) : 1
@@ -244,22 +242,22 @@ function _read_records!(dest::Vector{UInt8}, buffer::Vector{UInt8}, entries::Vec
     r = rec_first
     for i in start_idx:(end_idx + 1)
         gap_end = i <= end_idx ? min(entries[i].first - 1, rec_last) : rec_last
-        r <= gap_end && _fill_virtual!(dest, buffer, entries, i - 1, r - rec_first, gap_end - r + 1, record_bytes, compression, RST, virtual)
+        r <= gap_end && _fill_virtual!(dest, ds, entries, i - 1, r - rec_first, gap_end - r + 1, record_bytes, compression, virtual)
         i <= end_idx && (r = entries[i].last + 1)
     end
     return dest
 end
 
 # Fill `n` records of `dest` starting `skip` records in; `prev_idx` is the last entry before the gap.
-function _fill_virtual!(dest, buffer, entries, prev_idx, skip, n, record_bytes, compression, ::Type{RST}, virtual) where {RST}
+function _fill_virtual!(dest, ds, entries, prev_idx, skip, n, record_bytes, compression, virtual)
     record = Vector{UInt8}(undef, record_bytes)
     if virtual.prev && prev_idx >= 1
         e = entries[prev_idx]
         if compression == NoCompression
-            _read_entry!(record, buffer, e, e.last, e.last, record_bytes, compression, RST, nothing)
+            _read_entry!(record, ds, e, e.last, e.last, record_bytes, compression, nothing)
         else
             _with_decompressor() do decompressor
-                _read_entry!(record, buffer, e, e.last, e.last, record_bytes, compression, RST, decompressor)
+                _read_entry!(record, ds, e, e.last, e.last, record_bytes, compression, decompressor)
             end
         end
     else
@@ -274,7 +272,8 @@ function _fill_virtual!(dest, buffer, entries, prev_idx, skip, n, record_bytes, 
     return
 end
 
-function _read_entry!(dest, buffer, e::VVREntry, rec_first, rec_last, record_bytes, compression, ::Type{RST}, decompressor) where {RST}
+function _read_entry!(dest, ds::CDFDataset{RST}, e::VVREntry, rec_first, rec_last, record_bytes, compression, decompressor) where {RST}
+    buffer = parent(ds)
     lo, hi = max(rec_first, e.first), min(rec_last, e.last)
     doffs = (lo - rec_first) * record_bytes + 1
     nbytes = (hi - lo + 1) * record_bytes
@@ -284,9 +283,12 @@ function _read_entry!(dest, buffer, e::VVREntry, rec_first, rec_last, record_byt
     elseif skip == 0 && hi == e.last
         load_cvvr_data!(dest, doffs, buffer, e.offset, nbytes, RST, compression; decompressor)
     else
-        scratch = Vector{UInt8}(undef, length(e) * record_bytes)
-        load_cvvr_data!(scratch, 1, buffer, e.offset, length(scratch), RST, compression; decompressor)
-        copyto!(dest, doffs, scratch, skip + 1, nbytes)
+        block = cached_block!(BLOCK_CACHE, (dataset_id(ds), e.offset)) do
+            b = Vector{UInt8}(undef, length(e) * record_bytes)
+            load_cvvr_data!(b, 1, buffer, e.offset, length(b), RST, compression; decompressor)
+            b
+        end
+        copyto!(dest, doffs, block, skip + 1, nbytes)
     end
     return
 end

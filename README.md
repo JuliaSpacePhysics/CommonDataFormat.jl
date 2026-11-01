@@ -39,7 +39,7 @@ read!(var, buf, 1:3, 1:100)
 ## Features
 
 - **Efficient data access** - Memory-mapped access for data and attributes, super fast decompression using [`LibDeflate`](https://github.com/jakobnissen/LibDeflate.jl)
-- **Partial reads** - indexing reads only the records spanned.
+- **Partial reads** - indexing reads only the records spanned; compressed blocks a read covers only partly stay cached for later reads.
 
 
 ## Elsewhere

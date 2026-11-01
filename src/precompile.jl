@@ -11,6 +11,7 @@ PrecompileTools.@setup_workload begin
                 A = Array(var)
                 eltype(var) <: CDFDateTime && (DateTime.(A); string(A[1]))
             end
+            close(ds)
         end
     end
 end
