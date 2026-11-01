@@ -22,6 +22,12 @@ let ds = CDFDataset(ELX_FILE), var = ds["elb_pef_hs_Epat_eflux"]
     g = SUITE["elx"] = BenchmarkGroup()
     g["sum_array"] = @benchmarkable sum(Array($var))
     g["full_load"] = @benchmarkable full_load(ELX_FILE)
+
+    a = SUITE["attrib"] = BenchmarkGroup()
+    a["global_get"] = @benchmarkable $ds.attrib["Project"]
+    a["global_all"] = @benchmarkable Dict($ds.attrib)
+    a["var_get"] = @benchmarkable get($var.attrib, "CATDESC", nothing)
+    a["var_all"] = @benchmarkable Dict($var.attrib)
 end
 
 let ds = CDFDataset(MMS_FILE), var = ds["mms1_scm_acb_gse_scsrvy_srvy_l2"]
