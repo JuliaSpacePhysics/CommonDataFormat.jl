@@ -95,6 +95,41 @@ end
     @test_throws DimensionMismatch read!(v, zeros(eltype(v), 2), 1:3, 1:1, 1:1)
 end
 
+@testset "block cache LRU" begin
+    c = CDF.BlockCache(10, 3)
+    misses = Int[]
+    get!(k, n) = CDF.cached_block!(() -> (push!(misses, k); fill(UInt8(k), n)), c, (0, k))
+    foreach(k -> get!(k, 2), 1:3)
+    @test get!(1, 2) == fill(0x01, 2)
+    get!(4, 2)  # count limit evicts least recent: 2
+    @test first.(c.entries) == [(0, 3), (0, 1), (0, 4)]
+    get!(5, 5)  # byte limit evicts 3
+    @test first.(c.entries) == [(0, 1), (0, 4), (0, 5)] && c.nbytes == 9
+    get!(6, 11)  # larger than the budget: not cached
+    @test (0, 6) ∉ first.(c.entries) && c.nbytes == 9
+    @test misses == 1:6
+    CDF.cached_block!(() -> UInt8[], c, (1, 1))
+    CDF.evict_dataset!(c, 0)
+    @test first.(c.entries) == [(1, 1)] && c.nbytes == 0
+end
+
+@testset "partial reads of compressed entries through block cache" begin
+    dss = CDFDataset.(data_path.(("ac_h0_mfi_20230102_v07.cdf", "a_cdf_with_compressed_vars.cdf")))
+    cases = [(ds, k) for ds in dss for k in keys(ds) if any(e -> e.compressed && length(e) > 1, CDF.read_vvrs(ds[k].vdr, ds))]
+    @test length(unique(first, cases)) == 2
+    full = Dict(c => Array(c[1][c[2]]) for c in cases)
+    ranges = (10:20, 1:5, 5000:5400, 300:300)
+    function check((ds, k), r)
+        r = intersect(r, axes(full[(ds, k)], ndims(full[(ds, k)])))
+        sel = (ntuple(_ -> :, ndims(full[(ds, k)]) - 1)..., r)
+        return ds[k][sel...] == full[(ds, k)][sel...]
+    end
+    @test all(check(c, r) for cs in (cases, reverse(cases)) for c in cs for r in ranges)
+    @test all(fetch, [Threads.@spawn(check(c, r)) for c in cases for r in ranges])
+    close.(dss)
+    @test !any(k -> first(k) in CDF.dataset_id.(dss), first.(CDF.BLOCK_CACHE.entries))
+end
+
 @testset "Compressed cdf file (gzip)" begin
     compressed = CDFDataset(data_path("a_compressed_cdf.cdf"))
     reference = CDFDataset(data_path("a_cdf.cdf"))

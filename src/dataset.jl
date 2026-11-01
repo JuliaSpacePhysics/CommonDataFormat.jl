@@ -1,15 +1,56 @@
+# Decompressed blocks of all open datasets, least recently used first
+# Keyed by (dataset id, VVR offset) so memory doesn't grow with open files.
+mutable struct BlockCache
+    const lock::ReentrantLock
+    const entries::Vector{Pair{Tuple{Int,Int},Vector{UInt8}}}
+    nbytes::Int
+    const maxbytes::Int
+    const maxcount::Int  # bounds the key scan
+end
+BlockCache(maxbytes, maxcount) = BlockCache(ReentrantLock(), Pair{Tuple{Int,Int},Vector{UInt8}}[], 0, maxbytes, maxcount)
+const BLOCK_CACHE = BlockCache(1 << 27, 64)
+const DATASET_IDS = Threads.Atomic{Int}(0)
+
+function _evict!(c::BlockCache, i)
+    c.nbytes -= length(last(popat!(c.entries, i)))
+end
+
+evict_dataset!(c::BlockCache, id::Int) = @lock c.lock for i in reverse(eachindex(c.entries))
+    first(first(c.entries[i])) == id && _evict!(c, i)
+end
+
+function cached_block!(f, c::BlockCache, key::Tuple{Int,Int})
+    @lock c.lock begin
+        i = findlast(e -> first(e) == key, c.entries)  # hits are mostly the most recent block
+        isnothing(i) || return last(push!(c.entries, popat!(c.entries, i))[end])
+    end
+    block = f()::Vector{UInt8}
+    length(block) > c.maxbytes && return block
+    @lock c.lock begin
+        any(e -> first(e) == key, c.entries) && return block
+        push!(c.entries, key => block)
+        c.nbytes += length(block)
+        while length(c.entries) > c.maxcount || c.nbytes > c.maxbytes
+            _evict!(c, 1)
+        end
+    end
+    return block
+end
+
 struct CDFDataset{FST}
     filename::String
     cdr::CDR{FST}
     gdr::GDR{FST}
     buffer::Vector{UInt8}
     compression::CompressionType
+    id::Int
 end
 
 Base.parent(cdf::CDFDataset) = getfield(cdf, :buffer)
 GDR(cdf::CDFDataset) = getfield(cdf, :gdr)
 filename(cdf::CDFDataset) = getfield(cdf, :filename)
 recordsize_type(::CDFDataset{RS}) where {RS} = RS
+dataset_id(cdf::CDFDataset) = getfield(cdf, :id)
 
 """
     CDFDataset(filename)
@@ -45,10 +86,10 @@ function CDFDataset{FST}(fname, buffer) where {FST}
     end
     cdr = CDR{FST}(buffer, 8)
     gdr = GDR{FST}(buffer, Int(cdr.gdr_offset))
-    return CDFDataset{FST}(fname, cdr, gdr, buffer, compression)
+    return CDFDataset{FST}(fname, cdr, gdr, buffer, compression, Threads.atomic_add!(DATASET_IDS, 1))
 end
 
-Base.close(cdf::CDFDataset) = (finalize(parent(cdf)); nothing)
+Base.close(cdf::CDFDataset) = (evict_dataset!(BLOCK_CACHE, dataset_id(cdf)); finalize(parent(cdf)); nothing)
 
 is_big_endian_encoding(cdf::CDFDataset) = is_big_endian_encoding(cdf.cdr.encoding)
 
