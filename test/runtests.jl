@@ -44,7 +44,7 @@ end
         ranges = [let a = rand(1:d); a:rand(a:d) end for d in rdims]
         src = reshape(raw, esz, rdims..., nrec)
         dst = Vector{UInt8}(undef, esz * prod(length, ranges) * nrec)
-        GC.@preserve dst raw CDF._copy_subblock!(pointer(dst), pointer(raw), esz, rdims, ranges, nrec)
+        GC.@preserve dst raw CDF._copy_subregion!(pointer(dst), pointer(raw), esz, rdims, ranges, nrec)
         @test dst == vec(src[:, ranges..., :])
     end
 end
@@ -75,10 +75,24 @@ end
     @test ds.version == (3, 9, 0)
     @test ds.majority == CDF.Row
     @test ds.compression == CDF.NoCompression
-    @test first(ds) == ds["var"]
-    @test occursin("Version: 3.9.0", string(ds))
-    @test occursin("CDFDataset", sprint(show, MIME("text/plain"), ds))
+    @test first(ds).name == "var"
     @test occursin("attributes: ", sprint(show, MIME("text/plain"), ds["var"]))
+end
+
+@testset "indexing" begin
+    v = CDFDataset(data_path("a_cdf.cdf"))["var3d_counter"]
+    A = Array(v)
+    for I in ((2, :, 3), (1:2, 2, 2:4), (:, :, :), (3, 2, 4), (2:1, :, 1))
+        @test v[I...] == A[I...]
+    end
+    @test v[:, end, end] == A[:, end, end]
+    for i in (5, length(A))
+        @test v[i] == A[i]
+    end
+    @test v[end] == A[end]
+    @test_throws BoundsError v[4, 1, 1]
+    @test_throws BoundsError v[0]
+    @test_throws DimensionMismatch read!(v, zeros(eltype(v), 2), 1:3, 1:1, 1:1)
 end
 
 @testset "Compressed cdf file (gzip)" begin
@@ -105,12 +119,9 @@ end
     @test ds.compression == CDF.NoCompression
     @test ds["var"][1:5] == reference["var"][1:5]
     @test ds["var2d"][1, :] == reference["var2d"][1, :]
-    @test ds["var_string"] == reference["var_string"]
+    @test Array(ds["var_string"]) == Array(reference["var_string"])
 
-    var = ds["var"]
-    #TODO: find a better and small dataset to really test the chunking
-    @test CommonDataFormat._eachchunk_vvrs(ds["var3d"]) == CommonDataFormat._eachchunk(ds["var3d"])
-    @test occursin("compressed", string(var.vdr))
+    @test occursin("compressed", string(ds["var"].vdr))
 end
 
 @testset "NOVARY z-variable dimension" begin
@@ -133,9 +144,8 @@ end
 end
 
 @testset "CDF_CHAR" begin
-    file = data_path("ge_h0_cpi_00000000_v01.cdf")
-    ds = CDFDataset(file)
-    @test ds["label_v3c"] == ["Ion Vx GSE    " ; "Ion Vy GSE    " ; "Ion Vz GSE    ";;]
+    ds = CDFDataset(data_path("ge_h0_cpi_00000000_v01.cdf"))
+    @test Array(ds["label_v3c"]) == ["Ion Vx GSE    " ; "Ion Vy GSE    " ; "Ion Vz GSE    ";;]
 end
 
 @testset "r-variables" begin

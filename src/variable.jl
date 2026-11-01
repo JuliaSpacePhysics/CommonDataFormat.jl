@@ -1,5 +1,3 @@
-abstract type AbstractVariable{T,N} <: DiskArrays.AbstractDiskArray{T,N} end
-
 struct VVREntry
     first::Int
     last::Int
@@ -9,50 +7,60 @@ end
 
 Base.length(entry::VVREntry) = entry.last - entry.first + 1
 
-struct CDFVariable{T,N,V,P} <: AbstractVariable{T,N}
+# A handle on a variable in the file.
+struct CDFVariable{T,N,V,P}
     name::String
     vdr::V
     parentdataset::P
     dims::NTuple{N,Int}
 end
 
+Base.eltype(::Type{<:CDFVariable{T}}) where {T} = T
+Base.ndims(::CDFVariable{T,N}) where {T,N} = N
 Base.size(var::CDFVariable) = var.dims
+Base.size(var::CDFVariable, d::Integer) = d <= ndims(var) ? var.dims[d] : 1
+Base.length(var::CDFVariable) = prod(var.dims)
+Base.isempty(var::CDFVariable) = length(var) == 0
+Base.axes(var::CDFVariable) = map(Base.OneTo, var.dims)
+Base.axes(var::CDFVariable, d::Integer) = Base.OneTo(size(var, d))
+Base.firstindex(::CDFVariable, d::Integer...) = 1
+Base.lastindex(var::CDFVariable) = length(var)
+Base.lastindex(var::CDFVariable, d::Integer) = size(var, d)
+
+const RegionIndex = Union{Integer,AbstractUnitRange{<:Integer},Colon}
+
+# One index per dimension, reading only the records spanned, or one integer linear index.
+function Base.getindex(var::CDFVariable{T,N}, I::RegionIndex...) where {T,N}
+    length(I) == 1 && N > 1 && only(I) isa Integer && return _getlinear(var, only(I))
+    length(I) == N || throw(ArgumentError("index a $N-dimensional CDFVariable with $N indices or one integer"))
+    region = map(_region, axes(var), I)
+    all(map(issubset, region, axes(var))) || throw(BoundsError(var, I))
+    all(i -> i isa Integer, I) && return _element(var, map(Int, I))
+    return reshape(read!(var, Array{T,N}(undef, map(length, region)), region...), _kept(I, region))
+end
+
+_region(ax, i::Integer) = i:i
+_region(ax, ::Colon) = ax
+_region(ax, r::AbstractUnitRange) = r
+
+# Lengths of the dimensions not indexed by an integer.
+_kept(::Tuple{}, ::Tuple{}) = ()
+_kept(I::Tuple, R::Tuple) = first(I) isa Integer ? _kept(Base.tail(I), Base.tail(R)) : (length(first(R)), _kept(Base.tail(I), Base.tail(R))...)
+
+function _getlinear(var::CDFVariable, i::Integer)
+    1 <= i <= length(var) || throw(BoundsError(var, (i,)))
+    return _element(var, Tuple(CartesianIndices(var.dims)[i]))
+end
+
+_element(var::CDFVariable{T,N}, I::NTuple{N,Int}) where {T,N} =
+    only(read!(var, Array{T,N}(undef, ntuple(_ -> 1, Val(N))), map(i -> i:i, I)...))
+
+Base.Array(var::CDFVariable{T,N}) where {T,N} = read!(var, Array{T,N}(undef, var.dims))
+
+Base.read!(var::CDFVariable, dest::AbstractArray) = read!(var, dest, axes(var)...)
 
 @inline majority(var::CDFVariable) = majority(var.parentdataset)
 @inline is_big_endian_encoding(var::CDFVariable) = is_big_endian_encoding(var.parentdataset)
-
-# Codes seem to be faster if we disable chunking
-DiskArrays.haschunks(::CDFVariable) = DiskArrays.Unchunked()
-# DiskArrays.haschunks(::CDFVariable) = DiskArrays.Chunked()
-DiskArrays.eachchunk(var::CDFVariable) = _eachchunk(var)
-
-function _eachchunk(var::CDFVariable)
-    N = ndims(var)
-    chunks = ntuple(N) do i
-        arraysize = var.dims[i]
-        chunksize = max(arraysize, 1) # handle zero-size dimensions
-        DiskArrays.RegularChunks(chunksize, 0, arraysize)
-    end
-    return DiskArrays.GridChunks(chunks)
-end
-
-function _eachchunk_vvrs(var::CDFVariable)
-    vvrs = read_vvrs(var.vdr, var.parentdataset)
-    N = ndims(var)
-    chunks = ntuple(N) do i
-        if i != N
-            DiskArrays.RegularChunks(var.dims[i], 0, var.dims[i])
-        else
-            chunksizes = length.(vvrs)
-            if length(vvrs) > 0
-                chunksizes[end] = @views var.dims[N] - sum(chunksizes[1:(end-1)])
-            end
-            DiskArrays.IrregularChunks(chunksizes=chunksizes)
-        end
-    end
-    return DiskArrays.GridChunks(chunks)
-end
-
 
 @inline function Base.getproperty(var::CDFVariable, name::Symbol)
     name in fieldnames(CDFVariable) && return getfield(var, name)
@@ -74,28 +82,7 @@ variable_type(v::CDFVariable) = get(v.attrib, "VAR_TYPE", "unknown")
 Base.summary(io::IO, var::CDFVariable{T}) where {T} =
     print(io, Base.dims2string(size(var)), " CDFVariable{", T, "}")
 
-# DiskArrays' reductions read chunk-by-chunk through its generic indexing,
-# which compiles per shape (~40-260 ms).
-# With Unchunked chunking that already means one full read
-for f in (:sum, :prod, :maximum, :minimum, :extrema, :all, :any, :count)
-    @eval Base.$f(var::CDFVariable; kw...) = Base.$f(Array(var); kw...)
-    @eval Base.$f(g::Function, var::CDFVariable; kw...) = Base.$f(g, Array(var); kw...)
-end
-
-Base.collect(var::CDFVariable) = Array(var)
-
-function Base.iterate(var::CDFVariable)
-    isempty(var) && return nothing
-    A = Array(var)
-    x, st = iterate(A)::Tuple
-    return x, (A, st)
-end
-function Base.iterate(::CDFVariable, state::Tuple{Array,Int})
-    A, st = state
-    r = iterate(A, st)
-    r === nothing && return nothing
-    return r[1], (A, r[2])
-end
+Base.show(io::IO, var::CDFVariable) = (summary(io, var); print(io, " ", repr(var.name)))
 
 function Base.show(io::IO, m::MIME"text/plain", var::CDFVariable)
     summary(io, var)

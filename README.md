@@ -25,12 +25,21 @@ println("Variables: ", keys(cdf))
 
 # Access a variable
 var = cdf["temperature"]
+size(var), eltype(var), var.attrib["UNITS"]
+```
+
+## Reading data
+
+```julia
+var[:, 1:100], var[5]
+Array(var)
+read!(var, buf, 1:3, 1:100)
 ```
 
 ## Features
 
 - **Efficient data access** - Memory-mapped access for data and attributes, super fast decompression using [`LibDeflate`](https://github.com/jakobnissen/LibDeflate.jl)
-- **[DiskArrays.jl](https://github.com/JuliaIO/DiskArrays.jl) integration** - Lazy representation of data on hard disk with AbstractDiskArray interface
+- **Partial reads** - indexing reads only the records spanned.
 
 
 ## Elsewhere
