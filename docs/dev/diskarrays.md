@@ -8,11 +8,9 @@
 ## Why we departed
 
 - Being an `AbstractArray` invited Base's element-wise fallbacks, which hide disk reads.
-- Chunk-aware execution pays off little:
-  - Only the record dim is split.
-  - Uncompressed record ranges are contiguous mmap slices, so chunk boundaries cost nothing.
-  - Only compressed blocks, which decompress whole, make chunk alignment matter.
-- Our integration had already turned off what DiskArrays adds. It declared `Unchunked()` ([#21][unchunked]) and bypassed DiskArrays for materialization, iteration and reductions ([#61][latency]). What remained was compile-time and maintenance cost ([#83][departure]).
+- CDF files are record-oriented and typically small enough to read whole or slice by time. Chunk-aware execution pays off little.
+- Paying for generality: compile latency for each part type, and chunk metadata one had to fake (EmptyDiskVector, the eachchunk override) ([#83][departure]).
+- We had already turned off what DiskArrays adds by declaring `Unchunked()` ([#21][unchunked]) and bypassing DiskArrays for materialization, iteration and reductions ([#61][latency]).
 
 [unchunked]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/pull/21
 [latency]: https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/pull/61
