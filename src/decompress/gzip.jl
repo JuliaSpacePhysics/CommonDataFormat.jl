@@ -1,7 +1,7 @@
 # Decompress the single gzip member at `in_ptr` into at most `max_outlen` bytes at `out_ptr`,
 # taking the exact output size from the ISIZE trailer to use libdeflate's faster known-size path.
 # Returns the number of bytes written or a `LibDeflateError`.
-# LibDeflate 1.x (Julia ≥ 1.12) rewrote the API; 0.4 is kept for Julia 1.10/1.11.
+# LibDeflate 1.x requires Julia ≥ 1.12 with new API
 @static if pkgversion(LibDeflate) >= v"1"
     function _unsafe_gzip_decompress!(decompressor::Decompressor, out_ptr, max_outlen, in_ptr::Ptr, len::Integer)
         len < 10 && return LibDeflateErrors.input_too_short
