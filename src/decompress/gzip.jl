@@ -42,4 +42,13 @@ else
     end
 end
 
+function _with_decompressor(f)
+    decompressor = take!(decompressors())
+    try
+        return f(decompressor)
+    finally
+        put!(decompressors(), decompressor)
+    end
+end
+
 _unsafe_gzip_decompress!(::Nothing, args...) = _with_decompressor(d -> _unsafe_gzip_decompress!(d, args...))

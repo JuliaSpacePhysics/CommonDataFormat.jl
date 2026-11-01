@@ -206,32 +206,21 @@ function _covers(entries, rec_range)
     return r > last(rec_range)
 end
 
-function _with_decompressor(f)
-    decompressor = take!(decompressors())
-    try
-        return f(decompressor)
-    finally
-        put!(decompressors(), decompressor)
-    end
-end
-
 # Fill `dest` (exactly `nrec * record_bytes` bytes) with records `rec_first:rec_last`.
 # Element-type agnostic so decompression loop compiles once per record-size type.
 function _read_records!(dest::Vector{UInt8}, ds::CDFDataset, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, record_bytes::Int, compression::CompressionType, virtual::VirtualRecords)
     start_idx = searchsortedfirst(entries, rec_first; by = _entry_last)
     end_idx = searchsortedlast(entries, rec_last; by = _entry_first)
-    if compression == NoCompression
+    nworkers = compression != NoCompression && length(dest) >= 1 << 20 ? min(end_idx - start_idx + 1, nthreads()) : 1
+    if nworkers == 1
         for i in start_idx:end_idx
-            _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression, nothing)
+            _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression)
         end
     else
         next = Threads.Atomic{Int}(start_idx)
-        work() = _with_decompressor() do decompressor
-            while (i = Threads.atomic_add!(next, 1)) <= end_idx
-                _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression, decompressor)
-            end
+        work() = while (i = Threads.atomic_add!(next, 1)) <= end_idx
+            _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression)
         end
-        nworkers = length(dest) >= 1 << 20 ? min(end_idx - start_idx + 1, nthreads()) : 1
         tasks = [Threads.@spawn(work()) for _ in 2:nworkers]
         try
             work()
@@ -253,13 +242,7 @@ function _fill_virtual!(dest, ds, entries, prev_idx, skip, n, record_bytes, comp
     record = Vector{UInt8}(undef, record_bytes)
     if virtual.prev && prev_idx >= 1
         e = entries[prev_idx]
-        if compression == NoCompression
-            _read_entry!(record, ds, e, e.last, e.last, record_bytes, compression, nothing)
-        else
-            _with_decompressor() do decompressor
-                _read_entry!(record, ds, e, e.last, e.last, record_bytes, compression, decompressor)
-            end
-        end
+        _read_entry!(record, ds, e, e.last, e.last, record_bytes, compression)
     else
         esz = length(virtual.pad)
         for k in 0:esz:(record_bytes - 1)
@@ -272,7 +255,7 @@ function _fill_virtual!(dest, ds, entries, prev_idx, skip, n, record_bytes, comp
     return
 end
 
-function _read_entry!(dest, ds::CDFDataset{RST}, e::VVREntry, rec_first, rec_last, record_bytes, compression, decompressor) where {RST}
+function _read_entry!(dest, ds::CDFDataset{RST}, e::VVREntry, rec_first, rec_last, record_bytes, compression) where {RST}
     buffer = parent(ds)
     lo, hi = max(rec_first, e.first), min(rec_last, e.last)
     doffs = (lo - rec_first) * record_bytes + 1
@@ -281,11 +264,11 @@ function _read_entry!(dest, ds::CDFDataset{RST}, e::VVREntry, rec_first, rec_las
     if !e.compressed
         load_vvr_data!(dest, doffs, buffer, e.offset + skip, nbytes, RST)
     elseif skip == 0 && hi == e.last
-        load_cvvr_data!(dest, doffs, buffer, e.offset, nbytes, RST, compression; decompressor)
+        load_cvvr_data!(dest, doffs, buffer, e.offset, nbytes, RST, compression)
     else
         block = cached_block!(BLOCK_CACHE, (dataset_id(ds), e.offset)) do
             b = Vector{UInt8}(undef, length(e) * record_bytes)
-            load_cvvr_data!(b, 1, buffer, e.offset, length(b), RST, compression; decompressor)
+            load_cvvr_data!(b, 1, buffer, e.offset, length(b), RST, compression)
             b
         end
         copyto!(dest, doffs, block, skip + 1, nbytes)

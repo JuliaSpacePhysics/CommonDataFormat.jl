@@ -12,8 +12,8 @@ end
     return CVVR(Int64(cSize), pos)
 end
 
-function load_cvvr_data!(data, pos, src::Vector{UInt8}, offset, N, ::Type{RecordSizeType}, compression::CompressionType; decompressor = Decompressor()) where {RecordSizeType}
+function load_cvvr_data!(data, pos, src::Vector{UInt8}, offset, N, ::Type{RecordSizeType}, compression::CompressionType) where {RecordSizeType}
     cvvr = CVVR(src, offset, RecordSizeType)
-    decompress_bytes!(decompressor, data, pos, src, cvvr.data_offset, N, cvvr.cSize, compression)
+    decompress_bytes!(nothing, data, pos, src, cvvr.data_offset, N, cvvr.cSize, compression)
     return
 end
