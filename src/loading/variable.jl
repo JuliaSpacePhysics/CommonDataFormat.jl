@@ -1,13 +1,16 @@
-# ---- Type-erased block moves: dims/strides are runtime vectors ----
-# Element movers, chosen once per block by element size; `ByteMove` covers odd sizes (CHAR data).
+# CDF allows 10 record dimensions
+const MAX_LEVELS = 11
+const SinkLevels = NTuple{MAX_LEVELS,Int}
+
+# Type-erased block moves: Element movers, chosen once per block by element size; `ByteMove` covers odd sizes (CHAR data)
 struct WordMove{U} end
 struct ByteMove end
 @inline (::WordMove{U})(d::Ptr{UInt8}, s::Ptr{UInt8}, ::Int) where {U} = unsafe_store!(Ptr{U}(d), unsafe_load(Ptr{U}(s)))
 @inline (::ByteMove)(d::Ptr{UInt8}, s::Ptr{UInt8}, esz::Int) = unsafe_copyto!(d, s, esz)
 
 # Gather a column-major block of `dims` elements (`esz` bytes each) whose source byte
-# strides are `sstrides` into contiguous `dst`.
-function _copy_block!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, dims::Vector{Int}, sstrides::Vector{Int})
+# strides are `sstrides` into contiguous `dst`. Levels past the used ones are `1` with stride `0`.
+function _copy_block!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, dims::SinkLevels, sstrides::SinkLevels)
     esz == 8 && return _copy_block!(dst, src, esz, dims, sstrides, WordMove{UInt64}())
     esz == 4 && return _copy_block!(dst, src, esz, dims, sstrides, WordMove{UInt32}())
     esz == 2 && return _copy_block!(dst, src, esz, dims, sstrides, WordMove{UInt16}())
@@ -16,30 +19,40 @@ function _copy_block!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, dims::Vector{I
     return _copy_block!(dst, src, esz, dims, sstrides, ByteMove())
 end
 
-function _copy_block!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, dims::Vector{Int}, sstrides::Vector{Int}, move)
-    n = length(dims)
-    n0 = dims[1]
-    s0 = sstrides[1]
+@inline function _copy_runs!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, n0::Int, s0::Int, n1::Int, s1::Int, move)
     run_bytes = n0 * esz
     memcpy_run = s0 == esz && run_bytes > 64  # a memmove call per short run costs more than it saves
-    nruns = 1
-    for k in 2:n
-        nruns *= dims[k]
-    end
-    idx = zeros(Int, n)
-    soff = 0
-    doff = 0
-    for _ in 1:nruns
+    for r in 0:(n1-1)
+        run = src + r * s1
         if memcpy_run
-            unsafe_copyto!(dst + doff, src + soff, run_bytes)
+            unsafe_copyto!(dst, run, run_bytes)
         else
             for i in 0:(n0-1)
-                move(dst + doff + i * esz, src + soff + i * s0, esz)
+                move(dst + i * esz, run + i * s0, esz)
             end
         end
-        doff += run_bytes
-        k = 2
-        while k <= n
+        dst += run_bytes
+    end
+    return dst
+end
+
+# Levels above the two innermost step an odometer: a call per run would dominate short runs.
+function _copy_block!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, dims::SinkLevels, sstrides::SinkLevels, move)
+    n0, s0, n1, s1 = dims[1], sstrides[1], dims[2], sstrides[2]
+    nouter = 1
+    for k in 3:MAX_LEVELS
+        nouter *= dims[k]
+    end
+    if nouter == 1
+        _copy_runs!(dst, src, esz, n0, s0, n1, s1, move)
+        return
+    end
+    idx = zeros(Int, MAX_LEVELS)
+    soff = 0
+    for _ in 1:nouter
+        dst = _copy_runs!(dst, src + soff, esz, n0, s0, n1, s1, move)
+        k = 3
+        while k <= MAX_LEVELS
             idx[k] += 1
             soff += sstrides[k]
             idx[k] < dims[k] && break
@@ -51,46 +64,53 @@ function _copy_block!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, dims::Vector{I
     return
 end
 
-# Row-major records → column-major in place. Each record of `rdims` is stored in
-# `reverse(rdims)` order; swapped through a bounded temp, a chunk of records at a time.
-function _majority_swap!(data::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, nrec::Int)
-    k = length(rdims)
-    k <= 1 && return
-    record_bytes = prod(rdims) * esz
-    sstrides = Vector{Int}(undef, k + 1)
-    s = esz
-    for i in k:-1:1
-        sstrides[i] = s
-        s *= rdims[i]
-    end
-    sstrides[k+1] = record_bytes
-    chunk = clamp((1 << 20) ÷ record_bytes, 1, nrec)
-    dims = push!(copy(rdims), chunk)
-    temp = Vector{UInt8}(undef, chunk * record_bytes)
-    GC.@preserve temp for r0 in 0:chunk:(nrec-1)
-        n = min(chunk, nrec - r0)
-        dims[end] = n
-        base = data + r0 * record_bytes
-        _copy_block!(pointer(temp), base, esz, dims, sstrides)
-        unsafe_copyto!(base, pointer(temp), n * record_bytes)
-    end
-    return
+# Byte stride of each record dimension as stored. Row-majority stores the last record dimension fastest.
+_strides(esz, rdims) = Base.front(accumulate(*, (esz, rdims...)))
+_strides(esz, rdims, row) = row ? reverse(_strides(esz, reverse(rdims))) : _strides(esz, rdims)
+
+# Output of a read. Records keep their stored layout in the file and in decode buffers, and each is
+# gathered straight into `dest`; decoders can target `dest` itself only when it shares that layout (`_direct`).
+struct RecordSink
+    dest::Ptr{UInt8}
+    esz::Int
+    nlevels::Int  # 0 if `_direct`
+    dims::SinkLevels  # taken from each record, without singletons (a loop per run), then the record count
+    sstrides::SinkLevels
+    offset::Int  # bytes into a stored record of the first element taken
+    record_bytes::Int  # stored
+    out_bytes::Int  # per record in `dest`
 end
 
-# Extract `ranges` of the record dims (all records) from contiguous column-major `src`.
-function _copy_subregion!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, ranges::Vector{UnitRange{Int}}, nrec::Int)
-    k = length(rdims)
-    sstrides = Vector{Int}(undef, k + 1)
-    s = esz
-    off = 0
-    for i in 1:k
-        sstrides[i] = s
-        off += (first(ranges[i]) - 1) * s
-        s *= rdims[i]
+_direct(s::RecordSink) = iszero(s.nlevels)
+
+function RecordSink(dest::Ptr{UInt8}, esz::Int, rdims::NTuple{K,Int}, ranges::NTuple{K,UnitRange{Int}}, row::Bool) where {K}
+    record_bytes = esz * prod(rdims; init = 1)
+    out_bytes = esz * prod(length, ranges; init = 1)
+    dims, sstrides = ntuple(_ -> 1, Val(MAX_LEVELS)), ntuple(_ -> 0, Val(MAX_LEVELS))
+    if out_bytes == record_bytes && (!row || count(>(1), rdims) <= 1)
+        return RecordSink(dest, esz, 0, dims, sstrides, 0, record_bytes, out_bytes)
     end
-    sstrides[k+1] = s
-    dims = push!(length.(ranges), nrec)
-    _copy_block!(dst, src + off, esz, dims, sstrides)
+    offset, m = 0, 0
+    for (r, st) in zip(ranges, _strides(esz, rdims, row))
+        offset += (first(r) - 1) * st
+        if length(r) > 1
+            m += 1
+            dims = Base.setindex(dims, length(r), m)
+            sstrides = Base.setindex(sstrides, st, m)
+        end
+    end
+    sstrides = Base.setindex(sstrides, record_bytes, m + 1)
+    return RecordSink(dest, esz, m + 1, dims, sstrides, offset, record_bytes, out_bytes)
+end
+
+# `nrec` stored records at `src` into `dest`, `rec` records in.
+function _store!(s::RecordSink, rec::Int, src::Ptr{UInt8}, nrec::Int)
+    dst = s.dest + rec * s.out_bytes
+    if _direct(s)
+        unsafe_copyto!(dst, src, nrec * s.record_bytes)
+    else
+        _copy_block!(dst, src + s.offset, s.esz, Base.setindex(s.dims, nrec, s.nlevels), s.sstrides)
+    end
     return
 end
 
@@ -107,7 +127,7 @@ function Base.read!(var::CDFVariable{T,N}, dest::AbstractArray{T}, ranges::Varar
         copyto!(dest, read!(var, Array{T}(undef, size(dest)), ranges...))
         return dest
     end
-    GC.@preserve dest _read_region!(Ptr{UInt8}(_ptr(dest)), sizeof(T), _region_args(var, ranges)..., var)
+    GC.@preserve dest _read_region!(Ptr{UInt8}(_ptr(dest)), sizeof(T), var, ranges)
     is_big_endian_encoding(var) && _byte_swap!(dest)
     return dest
 end
@@ -122,7 +142,7 @@ function Base.read!(var::CDFVariable{String,N}, dest::AbstractArray{String}, ran
     end
     w = Int(var.vdr.num_elems)
     bytes = Vector{UInt8}(undef, w * length(dest))
-    GC.@preserve bytes _read_region!(pointer(bytes), w, _region_args(var, ranges)..., var)
+    GC.@preserve bytes _read_region!(pointer(bytes), w, var, ranges)
     _fill_strings!(vec(dest), bytes, w)
     return dest
 end
@@ -144,12 +164,7 @@ function _fill_strings!(dest::Vector{String}, bytes::Vector{UInt8}, w::Int)
     return dest
 end
 
-function _region_args(var::CDFVariable, ranges)
-    rdims = Int[Base.front(var.dims)...]
-    other_ranges = UnitRange{Int}[Int(first(r)):Int(last(r)) for r in Base.front(ranges)]
-    rec_range = Int(first(ranges[end])):Int(last(ranges[end]))
-    return rdims, other_ranges, rec_range
-end
+_int_range(r) = Int(first(r)):Int(last(r))
 
 function record_index(vdr, ds::CDFDataset)
     return @lock getfield(ds, :record_index_lock) begin
@@ -160,24 +175,15 @@ function record_index(vdr, ds::CDFDataset)
     end
 end
 
-function _read_region!(dest, esz, rdims, other_ranges, rec_range, var::CDFVariable)
+function _read_region!(dest, esz, var::CDFVariable, ranges)
     vdr, ds = var.vdr, var.parentdataset
-    return _read_region!(dest, esz, rdims, other_ranges, rec_range, vdr, ds, record_index(vdr, ds)...)
+    sink = RecordSink(dest, esz, Base.front(var.dims), map(_int_range, Base.front(ranges)), majority(ds) == Row)
+    return _read_region!(sink, _int_range(ranges[end]), vdr, ds, record_index(vdr, ds)...)
 end
 
-function _read_region!(dest::Ptr{UInt8}, esz::Int, rdims::Vector{Int}, other_ranges::Vector{UnitRange{Int}}, rec_range::UnitRange{Int}, vdr, ds::CDFDataset, entries::Vector{VVREntry}, compression::CompressionType)
-    virtual = _covers(entries, rec_range) ? NO_VIRTUAL : VirtualRecords(vdr.s_records == 2, pad_bytes(vdr, ds, esz))
-    swap = majority(ds) == Row
-    nrec = length(rec_range)
-    record_bytes = prod(rdims) * esz
-    whole_records = length.(other_ranges) == rdims
-    nbytes = nrec * record_bytes
-    buf = whole_records ? unsafe_wrap(Vector{UInt8}, dest, nbytes) : Vector{UInt8}(undef, nbytes)
-    GC.@preserve buf begin
-        _read_records!(buf, ds, entries, first(rec_range), last(rec_range), record_bytes, compression, virtual)
-        swap && _majority_swap!(pointer(buf), esz, rdims, nrec)
-        whole_records || _copy_subregion!(dest, pointer(buf), esz, rdims, other_ranges, nrec)
-    end
+function _read_region!(sink::RecordSink, rec_range::UnitRange{Int}, vdr, ds::CDFDataset, entries::Vector{VVREntry}, compression::CompressionType)
+    virtual = _covers(entries, rec_range) ? NO_VIRTUAL : VirtualRecords(vdr.s_records == 2, pad_bytes(vdr, ds, sink.esz))
+    _read_records!(sink, ds, entries, first(rec_range), last(rec_range), compression, virtual)
     return
 end
 
@@ -214,25 +220,31 @@ function _covers(entries, rec_range)
     return r > last(rec_range)
 end
 
-# Fill `dest` (exactly `nrec * record_bytes` bytes) with records `rec_first:rec_last`.
+const NO_SCRATCH = UInt8[]  # direct sinks decode into `dest`
+
 # Element-type agnostic so decompression loop compiles once per record-size type.
-function _read_records!(dest::Vector{UInt8}, ds::CDFDataset, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, record_bytes::Int, compression::CompressionType, virtual::VirtualRecords)
+function _read_records!(sink::RecordSink, ds::CDFDataset, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, compression::CompressionType, virtual::VirtualRecords)
     start_idx = searchsortedfirst(entries, rec_first; by = _entry_last)
     end_idx = searchsortedlast(entries, rec_last; by = _entry_first)
     n = end_idx - start_idx + 1
-    threaded = compression != NoCompression && length(dest) >= 1 << 20
+    threaded = compression != NoCompression && (rec_last - rec_first + 1) * sink.record_bytes >= 1 << 20
     # Gzip entries decode up to 4 at once per task (faster per entry); with few entries,
     # smaller groups keep every thread busy.
     step = compression != GzipCompression ? 1 : threaded ? clamp(n ÷ nthreads(), 2, 4) : 4
     nworkers = threaded ? min(cld(n, step), nthreads()) : 1
+    read_group(i, scratch) = _read_entries!(sink, scratch, ds, entries, i, min(i + step - 1, end_idx), rec_first, rec_last, compression)
     if nworkers == 1
+        scratch = _direct(sink) ? NO_SCRATCH : UInt8[]
         for i in start_idx:step:end_idx
-            _read_entries!(dest, ds, entries, i, min(i + step - 1, end_idx), rec_first, rec_last, record_bytes, compression)
+            read_group(i, scratch)
         end
     else
         next = Threads.Atomic{Int}(start_idx)
-        work() = while (i = Threads.atomic_add!(next, step)) <= end_idx
-            _read_entries!(dest, ds, entries, i, min(i + step - 1, end_idx), rec_first, rec_last, record_bytes, compression)
+        function work()
+            buf = UInt8[]
+            while (i = Threads.atomic_add!(next, step)) <= end_idx
+                read_group(i, buf)
+            end
         end
         tasks = [Threads.@spawn(work()) for _ in 2:nworkers]
         try
@@ -244,70 +256,102 @@ function _read_records!(dest::Vector{UInt8}, ds::CDFDataset, entries::Vector{VVR
     r = rec_first
     for i in start_idx:(end_idx + 1)
         gap_end = i <= end_idx ? min(entries[i].first - 1, rec_last) : rec_last
-        r <= gap_end && _fill_virtual!(dest, ds, entries, i - 1, r - rec_first, gap_end - r + 1, record_bytes, compression, virtual)
+        r <= gap_end && _fill_virtual!(sink, ds, entries, i - 1, r - rec_first, gap_end - r + 1, compression, virtual)
         i <= end_idx && (r = entries[i].last + 1)
     end
-    return dest
+    return
 end
 
-# Fill `n` records of `dest` starting `skip` records in; `prev_idx` is the last entry before the gap.
-function _fill_virtual!(dest, ds, entries, prev_idx, skip, n, record_bytes, compression, virtual)
-    record = Vector{UInt8}(undef, record_bytes)
+# Fill `n` records of the output starting `skip` records in; `prev_idx` is the last entry before the gap.
+function _fill_virtual!(sink, ds, entries, prev_idx, skip, n, compression, virtual)
+    out = sink.out_bytes
+    first_rec = sink.dest + skip * out
     if virtual.prev && prev_idx >= 1
         e = entries[prev_idx]
-        _read_entry!(record, ds, e, e.last, e.last, record_bytes, compression)
+        _read_span!(sink, UInt8[], ds, e, e.last, e.last, skip, compression)
     else
-        esz = length(virtual.pad)
-        for k in 0:esz:(record_bytes - 1)
-            copyto!(record, k + 1, virtual.pad, 1, esz)
+        pad = virtual.pad
+        esz = length(pad)
+        GC.@preserve pad for k in 0:esz:(out - 1)
+            unsafe_copyto!(first_rec + k, pointer(pad), esz)
         end
     end
-    for j in 0:(n - 1)
-        copyto!(dest, (skip + j) * record_bytes + 1, record, 1, record_bytes)
+    for j in 1:(n - 1)
+        unsafe_copyto!(first_rec + j * out, first_rec, out)
     end
     return
 end
 
 # Entries `i:j` (at most 4); whole gzip entries among them decode together.
-function _read_entries!(dest, ds::CDFDataset{RST}, entries, i, j, rec_first, rec_last, record_bytes, compression) where {RST}
-    i == j && return _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression)
+function _read_entries!(sink, scratch, ds, entries, i, j, rec_first, rec_last, compression)
+    i == j && return _read_entry!(sink, scratch, ds, entries[i], rec_first, rec_last, compression)
     k1 = k2 = k3 = k4 = n = 0
     for k in i:j
         if compression == GzipCompression && _whole_compressed(entries[k], rec_first, rec_last)
             n += 1
             n == 1 ? (k1 = k) : n == 2 ? (k2 = k) : n == 3 ? (k3 = k) : (k4 = k)
         else
-            _read_entry!(dest, ds, entries[k], rec_first, rec_last, record_bytes, compression)
+            _read_entry!(sink, scratch, ds, entries[k], rec_first, rec_last, compression)
         end
     end
-    job(k) = ((entries[k].first - rec_first) * record_bytes + 1, entries[k].offset, length(entries[k]) * record_bytes)
+    whole(ks) = _decode_whole!(sink, scratch, ds, map(k -> (entries[k], entries[k].first - rec_first), ks), compression)
+    n == 1 && whole((k1,))
+    n == 2 && whole((k1, k2))
+    n == 3 && whole((k1, k2, k3))
+    n == 4 && whole((k1, k2, k3, k4))
+    return
+end
+
+# Whole compressed entries, each given with its position in the output records; several decode in lockstep (gzip only).
+function _decode_whole!(sink, scratch, ds::CDFDataset{RST}, jobs, compression) where {RST}
     buffer = parent(ds)
-    n == 1 && load_cvvr_group!(dest, buffer, (job(k1),), RST)
-    n == 2 && load_cvvr_group!(dest, buffer, (job(k1), job(k2)), RST)
-    n == 3 && load_cvvr_group!(dest, buffer, (job(k1), job(k2), job(k3)), RST)
-    n == 4 && load_cvvr_group!(dest, buffer, (job(k1), job(k2), job(k3), job(k4)), RST)
+    rb = sink.record_bytes
+    direct = _direct(sink)
+    sizes = map(((e, _),) -> length(e) * rb, jobs)
+    offsets = direct ? map(((_, rec),) -> rec * rb, jobs) : accumulate(+, (0, Base.front(sizes)...))
+    direct || resize!(scratch, sum(sizes))
+    GC.@preserve scratch begin
+        out = direct ? sink.dest : pointer(scratch)
+        if length(jobs) == 1
+            load_cvvr_data!(out + only(offsets), buffer, jobs[1][1].offset, only(sizes), RST, compression)
+        else
+            load_cvvr_group!(buffer, map(((e, _), o, n) -> (out + o, e.offset, n), jobs, offsets, sizes), RST)
+        end
+        if !direct
+            for ((e, rec), o) in zip(jobs, offsets)
+                _store!(sink, rec, out + o, length(e))
+            end
+        end
+    end
     return
 end
 
 _whole_compressed(e::VVREntry, rec_first, rec_last) = e.compressed && e.first >= rec_first && e.last <= rec_last
 
-function _read_entry!(dest, ds::CDFDataset{RST}, e::VVREntry, rec_first, rec_last, record_bytes, compression) where {RST}
-    buffer = parent(ds)
+function _read_entry!(sink, scratch, ds, e::VVREntry, rec_first, rec_last, compression)
     lo, hi = max(rec_first, e.first), min(rec_last, e.last)
-    doffs = (lo - rec_first) * record_bytes + 1
-    nbytes = (hi - lo + 1) * record_bytes
-    skip = (lo - e.first) * record_bytes
+    return _read_span!(sink, scratch, ds, e, lo, hi, lo - rec_first, compression)
+end
+
+# Records `lo:hi` of `e` into the output, `rec` records in.
+function _read_span!(sink, scratch, ds::CDFDataset{RST}, e::VVREntry, lo, hi, rec, compression) where {RST}
+    buffer = parent(ds)
+    rb = sink.record_bytes
+    skip = (lo - e.first) * rb
     if !e.compressed
-        load_vvr_data!(dest, doffs, buffer, e.offset + skip, nbytes, RST)
-    elseif _whole_compressed(e, rec_first, rec_last)
-        load_cvvr_data!(dest, doffs, buffer, e.offset, nbytes, RST, compression)
+        nrec = hi - lo + 1
+        pos = _after_header(e.offset, RST) + skip
+        checkbounds(buffer, pos:(pos + nrec * rb - 1))
+        GC.@preserve buffer _store!(sink, rec, pointer(buffer, pos), nrec)
+    elseif _whole_compressed(e, lo, hi)
+        _decode_whole!(sink, scratch, ds, ((e, rec),), compression)
     else
         block = cached_block!(BLOCK_CACHE, (dataset_id(ds), e.offset)) do
-            b = Vector{UInt8}(undef, length(e) * record_bytes)
-            load_cvvr_data!(b, 1, buffer, e.offset, length(b), RST, compression)
+            b = Vector{UInt8}(undef, length(e) * rb)
+            GC.@preserve b load_cvvr_data!(pointer(b), buffer, e.offset, length(b), RST, compression)
             b
         end
-        copyto!(dest, doffs, block, skip + 1, nbytes)
+        GC.@preserve block _store!(sink, rec, pointer(block, skip + 1), hi - lo + 1)
     end
     return
 end

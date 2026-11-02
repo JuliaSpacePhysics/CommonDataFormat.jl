@@ -7,7 +7,8 @@ Base.iterate(r::Record, i = 1) = i > fieldcount(typeof(r)) ? nothing : (getfield
 # VDR chains all store the next record's offset in the field right after that header.
 record_size(buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT} = Int(read_be(buffer, offset + 1, FieldSizeT))
 get_record_type(buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT} = read_be(buffer, offset + sizeof(FieldSizeT) + 1, Int32)
-next_record_offset(buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT} = Int(read_be(buffer, offset + sizeof(FieldSizeT) + 5, FieldSizeT))
+_after_header(offset, ::Type{FieldSizeT}) where {FieldSizeT} = offset + sizeof(FieldSizeT) + 5
+next_record_offset(buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT} = Int(read_be(buffer, _after_header(offset, FieldSizeT), FieldSizeT))
 
 @inline function check_record_type(record_type::Integer, buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT}
     pos = offset + sizeof(FieldSizeT) + 1
@@ -22,7 +23,6 @@ include("vdr.jl")
 include("vxr.jl")
 include("adr.jl")
 include("aedr.jl")
-include("vvr.jl")
 include("cpr.jl")
 include("ccr.jl")
 include("cvvr.jl")

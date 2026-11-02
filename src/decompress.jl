@@ -9,21 +9,20 @@ function decompress_bytes(buffer, ::Type{RecordSizeType}) where {RecordSizeType}
     new_buffer = Vector{UInt8}(undef, 8 + n)
     copyto!(new_buffer, 1, buffer, 1, 4)
     write_be(new_buffer, 5, 0x0000FFFF)  # the uncompressed marker replaces the CCR magic
-    decompress_bytes!(new_buffer, 9, buffer, ccr.data_offset, n, ccr.data_length, compression)
+    GC.@preserve new_buffer decompress_bytes!(pointer(new_buffer, 9), buffer, ccr.data_offset, n, ccr.data_length, compression)
     return new_buffer, compression
 end
 
-function decompress_bytes!(dest, doffs, src::AbstractVector{UInt8}, soffs, N, n_in, compression::CompressionType)
-    n_out = N * sizeof(eltype(dest))
+function decompress_bytes!(dest::Ptr{UInt8}, src::AbstractVector{UInt8}, soffs, n_out, n_in, compression::CompressionType)
+    checkbounds(src, soffs:(soffs + n_in - 1))
     if compression == NoCompression
         n_in == n_out || throw(ArgumentError("Uncompressed payload size mismatch (expected $n_out, got $n_in)"))
-        _copy_to!(dest, doffs, src, soffs, N)
+        GC.@preserve src unsafe_copyto!(dest, pointer(src, soffs), n_out)
     elseif compression == GzipCompression
-        checkbounds(src, soffs:(soffs + n_in - 1))
-        GC.@preserve dest src gzip_decompress!(Ptr{UInt8}(pointer(dest, doffs)), n_out, pointer(src, soffs), n_in)
+        GC.@preserve src gzip_decompress!(dest, n_out, pointer(src, soffs), n_in)
     elseif compression == RLECompression
         out = _rle_decompress(view(src, soffs:(soffs + n_in - 1)), n_out)
-        _copy_to!(dest, doffs, out, 1, N)
+        GC.@preserve out unsafe_copyto!(dest, pointer(out), n_out)
     else
         throw(ArgumentError("unsupported compression: $compression"))
     end
