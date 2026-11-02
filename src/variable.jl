@@ -36,7 +36,8 @@ function Base.getindex(var::CDFVariable{T,N}, I::RegionIndex...) where {T,N}
     region = map(_region, axes(var), I)
     all(map(issubset, region, axes(var))) || throw(BoundsError(var, I))
     all(i -> i isa Integer, I) && return _element(var, map(Int, I))
-    return reshape(read!(var, Array{T,N}(undef, map(length, region)), region...), _kept(I, region))
+    dest = read!(var, Array{T,N}(undef, map(length, region)), region...)
+    return any(i -> i isa Integer, I) ? reshape(dest, _kept(I, region)) : dest
 end
 
 _region(ax, i::Integer) = i:i

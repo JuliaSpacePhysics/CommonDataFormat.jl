@@ -30,23 +30,71 @@ end
     include("trim.jl")
 end
 
-# Reference the type-erased block kernels against permutedims/view on random shapes.
-@testset "block copy kernels" begin
-    for esz in (1, 4, 8, 9), k in 1:4
+# Reference the record gather against permutedims/view on random shapes.
+@testset "record sink" begin
+    for esz in (1, 4, 8, 9), k in 1:4, row in (false, true)
         rdims = rand(1:5, k)
         nrec = rand(1:4)
         raw = rand(UInt8, prod(rdims) * esz * nrec)
-        stored = reshape(raw, esz, reverse(rdims)..., nrec)
-        expected = permutedims(stored, (1, (k + 1):-1:2..., k + 2))
-        swapped = copy(raw)
-        GC.@preserve swapped CDF._majority_swap!(pointer(swapped), esz, rdims, nrec)
-        @test swapped == vec(expected)
+        stored = reshape(raw, esz, (row ? reverse(rdims) : rdims)..., nrec)
+        src = row ? permutedims(stored, (1, (k + 1):-1:2..., k + 2)) : stored
+        for ranges in ([1:d for d in rdims], [let a = rand(1:d); a:rand(a:d) end for d in rdims], [(d + 1) ÷ 2:(d + 1) ÷ 2 for d in rdims])
+            dst = Vector{UInt8}(undef, esz * prod(length, ranges) * nrec)
+            GC.@preserve raw dst begin
+                sink = CDF.RecordSink(pointer(dst), esz, Tuple(rdims), Tuple(ranges), row)
+                CDF._store!(sink, 0, pointer(raw), nrec)
+            end
+            @test dst == vec(src[:, ranges..., :])
+        end
+    end
+end
 
-        ranges = [let a = rand(1:d); a:rand(a:d) end for d in rdims]
-        src = reshape(raw, esz, rdims..., nrec)
-        dst = Vector{UInt8}(undef, esz * prod(length, ranges) * nrec)
-        GC.@preserve dst raw CDF._copy_subregion!(pointer(dst), pointer(raw), esz, rdims, ranges, nrec)
-        @test dst == vec(src[:, ranges..., :])
+# The test files lack these entry layouts, so CVVRs are synthesized from `(first, last, bytes)`.
+function gzip_dataset(spans)
+    buffer, entries = UInt8[], CDF.VVREntry[]
+    for (first_rec, last_rec, bytes) in spans
+        gz = zlib_gzip(bytes; level = 1)
+        push!(entries, CDF.VVREntry(first_rec, last_rec, length(buffer), true))
+        append!(buffer, zeros(UInt8, 16), reinterpret(UInt8, [hton(Int64(length(gz)))]), gz)
+    end
+    template = CDFDataset(data_path("a_cdf.cdf"))
+    ds = CDFDataset{Int64}("", getfield(template, :cdr), getfield(template, :gdr), buffer, CDF.NoCompression, -1, Dict{Int,Tuple{Vector{CDF.VVREntry},CDF.CompressionType}}(), ReentrantLock())
+    return ds, entries
+end
+
+# The gap's copy of the entry belongs at the gap's position, not at the entry's own.
+@testset "previous-record gap after a one-record gzip entry" begin
+    esz, rdims = 4, [2, 3]
+    r1, r4 = rand(UInt8, esz * prod(rdims)), rand(UInt8, esz * prod(rdims))
+    ds, entries = gzip_dataset([(1, 1, r1), (4, 4, r4)])
+    stored = reshape([r1; r1; r1; r4], esz, rdims..., :)
+    for ranges in ([1:2, 1:3], [2:2, 2:3])
+        dst = zeros(UInt8, esz * prod(length, ranges) * 4)
+        GC.@preserve dst begin
+            sink = CDF.RecordSink(pointer(dst), esz, Tuple(rdims), Tuple(ranges), false)
+            CDF._read_records!(sink, ds, entries, 1, 4, CDF.GzipCompression, CDF.VirtualRecords(true, UInt8[]))
+        end
+        @test dst == vec(stored[:, ranges..., :])
+    end
+end
+
+@testset "threaded gzip reads through scratch" begin
+    esz, rdims, per_entry, nentries = 8, [3, 4], 1000, 16
+    record_bytes = esz * prod(rdims)
+    raw = rand(UInt8, record_bytes * per_entry * nentries)
+    ds, entries = gzip_dataset(map(1:nentries) do i
+        last_rec = i * per_entry
+        (last_rec - per_entry + 1, last_rec, raw[((last_rec - per_entry) * record_bytes + 1):(last_rec * record_bytes)])
+    end)
+    stored = reshape(raw, esz, rdims..., :)
+    dst = Vector{UInt8}(undef, esz * 4 * per_entry * nentries)
+    expected = vec(stored[:, 2:2, :, :])
+    for _ in 1:20
+        GC.@preserve dst begin
+            sink = CDF.RecordSink(pointer(dst), esz, Tuple(rdims), (2:2, 1:4), false)
+            CDF._read_records!(sink, ds, entries, 1, per_entry * nentries, CDF.GzipCompression, CDF.NO_VIRTUAL)
+        end
+        @test dst == expected
     end
 end
 
@@ -94,6 +142,29 @@ end
     @test_throws BoundsError v[4, 1, 1]
     @test_throws BoundsError v[0]
     @test_throws DimensionMismatch read!(v, zeros(eltype(v), 2), 1:3, 1:1, 1:1)
+
+    # partial reads against whole-record reads: both majorities and encodings, spanning entries,
+    # odd element size, virtual records, compression
+    for (file, name) in (
+            (download_test_data("https://cdaweb.gsfc.nasa.gov/pub/data/canopus/mari_mag/1995/cn_k0_mari_19950102_v01.cdf"), "Time_PB5"),
+            (data_path("ac_h2_sis_20101105_v06.cdf"), "flux_He"),
+            (data_path("elb_l2_epdef_20210914_v01.cdf"), "elb_pef_hs_Epat_eflux"),
+            (data_path("a_cdf.cdf"), "var4d_string"),
+            (data_path("sparse.cdf"), "pad2d"),
+            (data_path("a_cdf_with_compressed_vars.cdf"), "var3d_counter"),
+        )
+        v = CDFDataset(file)[name]
+        A = Array(v)
+        N, sz = ndims(v), size(v)
+        for I in (
+                ntuple(d -> d == 1 ? 2 : Colon(), N),
+                ntuple(d -> d == N ? (((sz[N] + 1) ÷ 2):sz[N]) : (2:sz[d]), N),
+                ntuple(d -> d == N ? 1 : Colon(), N),
+                sz,
+            )
+            @test isequal(v[I...], A[I...])
+        end
+    end
 end
 
 @testset "block cache LRU" begin

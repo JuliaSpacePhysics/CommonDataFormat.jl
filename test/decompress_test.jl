@@ -40,7 +40,7 @@ end
     buf = make_cvvr(payload)
 
     dest = Vector{Float64}(undef, length(data))
-    load_cvvr_data!(dest, 1, buf, 0, length(data), Int64, RLECompression)
+    GC.@preserve dest load_cvvr_data!(Ptr{UInt8}(pointer(dest)), buf, 0, sizeof(dest), Int64, RLECompression)
     @test dest == data
 
     # long zero run crossing the 256-byte chunk limit
@@ -48,12 +48,12 @@ end
     data2[513] = 0x7f
     buf2 = make_cvvr(rle_compress(data2))
     dest2 = Vector{UInt8}(undef, 1000)
-    load_cvvr_data!(dest2, 1, buf2, 0, 1000, Int64, RLECompression)
+    GC.@preserve dest2 load_cvvr_data!(pointer(dest2), buf2, 0, 1000, Int64, RLECompression)
     @test dest2 == data2
 end
 
 @testset "unsupported variable compression" begin
     src = zeros(UInt8, 16)
     dest = Vector{Float64}(undef, 1)
-    @test_throws ArgumentError decompress_bytes!(dest, 1, src, 1, 1, 8, HuffmanCompression)
+    GC.@preserve dest @test_throws ArgumentError decompress_bytes!(Ptr{UInt8}(pointer(dest)), src, 1, 8, 8, HuffmanCompression)
 end
