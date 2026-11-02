@@ -65,11 +65,9 @@ end
 _name_width(::Type{FST}) where {FST} = FST == Int64 ? 256 : 64
 
 function readname(buf::Vector{UInt8}, offset::Int, ::Type{FST}) where {FST}
-    last = offset + _name_width(FST) - 1
-    for i in offset:last
-        buf[i] == 0x00 && return @views buf[offset:(i - 1)]
-    end
-    return @views buf[offset:last]
+    w = _name_width(FST)
+    n = something(findfirst(iszero, @view buf[offset:(offset + w - 1)]), w + 1) - 1
+    return GC.@preserve buf unsafe_string(pointer(buf, offset), n)
 end
 
 function name_equals(buf::Vector{UInt8}, offset::Int, name::String, ::Type{FST}) where {FST}

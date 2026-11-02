@@ -11,8 +11,9 @@ struct OffsetsIterator{RecordSizeType}
     start_pos::Int
 end
 
-Base.IteratorSize(::Type{<:OffsetsIterator}) = Base.SizeUnknown()
 Base.eltype(::Type{<:OffsetsIterator}) = Int
+# O(n) walk, but cheaper than reallocation `map` would do growing unsized
+Base.length(iter::OffsetsIterator) = count(Returns(true), iter)
 
 function Base.iterate(iter::OffsetsIterator{RecordSizeType}, pos::Int = iter.start_pos) where {RecordSizeType}
     pos == 0 && return nothing

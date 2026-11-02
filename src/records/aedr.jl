@@ -47,5 +47,6 @@ function load_attribute_data(::Type{T}, buffer::Vector{UInt8}, pos, NumElems, ne
 end
 
 function load_char_data(buffer::Vector{UInt8}, pos, NumElems)
-    return @views String((buffer[pos:(pos + NumElems - 1)]))
+    checkbounds(buffer, pos:(pos + NumElems - 1))
+    return GC.@preserve buffer unsafe_string(pointer(buffer, pos), NumElems)
 end
