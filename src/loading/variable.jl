@@ -152,8 +152,8 @@ function _region_args(var::CDFVariable, ranges)
 end
 
 function record_index(vdr, ds::CDFDataset)
-    return lock(getfield(ds, :record_index)) do index
-        get!(index, Int(vdr.vxr_head)) do
+    return @lock getfield(ds, :record_index_lock) begin
+        get!(getfield(ds, :record_index), Int(vdr.vxr_head)) do
             entries = read_vvrs(vdr, ds)
             (entries, any(e -> e.compressed, entries) ? variable_compression(vdr, ds) : NoCompression)
         end
