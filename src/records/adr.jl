@@ -9,12 +9,12 @@ struct ADR{FSZ} <: Record
     AgrEDRhead::FSZ    # The offset of the first Attribute g/rEntry Descriptor Record (AgrEDR) for this attribute.
     Scope::Int32     # 1 = global, 2 = variable
     Num::Int32          # Attribute number
-    NgrEntries::Int32      # Number of r-variables
-    MAXgrEntry::Int32     # Number of attributes
+    NgrEntries::Int32      # Number of g/rEntries
+    MAXgrEntry::Int32     # Highest g/rEntry number
     rfuA::RInt32        # Reserved field A
     AzEDRhead::FSZ   # The offset of the first Attribute zEntry Descriptor Record (AzEDR) for this attribute.
-    NzEntries::Int32      # Number of z-variables
-    MAXzEntry::Int32     # Number of z-entries
+    NzEntries::Int32      # Number of zEntries
+    MAXzEntry::Int32     # Highest zEntry number
     rfuE::RInt32        # Reserved field E
     name_pos::Int       # Name is read on demand (`adr_name`); lookups only compare it in place
 end
@@ -32,4 +32,4 @@ _adr_name_pos(offset, ::Type{FST}) where {FST} = offset + 37 + 4 * sizeof(FST)
     return ADR{FST}(fields..., pos)
 end
 
-adr_name(buffer, adr::ADR{FST}) where {FST} = String(readname(buffer, adr.name_pos, FST))
+adr_name(buffer, adr::ADR{FST}) where {FST} = readname(buffer, adr.name_pos, FST)

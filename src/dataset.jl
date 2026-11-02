@@ -173,7 +173,7 @@ function Base.keys(cdf::CDFDataset{FST}) where {FST}
     pad = _vdr_pad(cdf)
     i = 1
     for head in vdr_heads(cdf), offset in OffsetsIterator{FST}(buffer, head)
-        varnames[i] = String(vdr_name(buffer, offset, pad, FST))
+        varnames[i] = vdr_name(buffer, offset, pad, FST)
         i += 1
     end
     return varnames
@@ -190,7 +190,7 @@ function Base.iterate(cdf::CDFDataset{FST}, state = (Int(GDR(cdf).rVDRhead), tru
         offset == 0 && return nothing
     end
     buffer = parent(cdf)
-    var = _variable(cdf, String(vdr_name(buffer, offset, _vdr_pad(cdf), FST)), _vdr_at(cdf, offset))
+    var = _variable(cdf, vdr_name(buffer, offset, _vdr_pad(cdf), FST), _vdr_at(cdf, offset))
     return (var, (next_record_offset(buffer, offset, FST), in_rchain))
 end
 
