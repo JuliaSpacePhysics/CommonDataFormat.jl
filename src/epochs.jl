@@ -1,6 +1,4 @@
-# https://github.com/ancapdev/UnixTimes.jl/blob/master/src/UnixTimes.jl
 # CDF Epoch types as AbstractDateTime subtypes
-# Based on C++ CDFpp implementation
 # 1. CDF_EPOCH is milliseconds since Year 0 represented as a single double,
 # 2. CDF_EPOCH16 is picoseconds since Year 0 represented as 2-doubles,
 # 3. CDF_TIME_TT2000 (TT2000 as short) is nanoseconds since J2000 with leap seconds
