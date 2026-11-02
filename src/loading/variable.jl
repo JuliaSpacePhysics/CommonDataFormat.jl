@@ -219,15 +219,20 @@ end
 function _read_records!(dest::Vector{UInt8}, ds::CDFDataset, entries::Vector{VVREntry}, rec_first::Int, rec_last::Int, record_bytes::Int, compression::CompressionType, virtual::VirtualRecords)
     start_idx = searchsortedfirst(entries, rec_first; by = _entry_last)
     end_idx = searchsortedlast(entries, rec_last; by = _entry_first)
-    nworkers = compression != NoCompression && length(dest) >= 1 << 20 ? min(end_idx - start_idx + 1, nthreads()) : 1
+    n = end_idx - start_idx + 1
+    threaded = compression != NoCompression && length(dest) >= 1 << 20
+    # Gzip entries decode up to 4 at once per task (faster per entry); with few entries,
+    # smaller groups keep every thread busy.
+    step = compression != GzipCompression ? 1 : threaded ? clamp(n ÷ nthreads(), 2, 4) : 4
+    nworkers = threaded ? min(cld(n, step), nthreads()) : 1
     if nworkers == 1
-        for i in start_idx:end_idx
-            _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression)
+        for i in start_idx:step:end_idx
+            _read_entries!(dest, ds, entries, i, min(i + step - 1, end_idx), rec_first, rec_last, record_bytes, compression)
         end
     else
         next = Threads.Atomic{Int}(start_idx)
-        work() = while (i = Threads.atomic_add!(next, 1)) <= end_idx
-            _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression)
+        work() = while (i = Threads.atomic_add!(next, step)) <= end_idx
+            _read_entries!(dest, ds, entries, i, min(i + step - 1, end_idx), rec_first, rec_last, record_bytes, compression)
         end
         tasks = [Threads.@spawn(work()) for _ in 2:nworkers]
         try
@@ -263,6 +268,29 @@ function _fill_virtual!(dest, ds, entries, prev_idx, skip, n, record_bytes, comp
     return
 end
 
+# Entries `i:j` (at most 4); whole gzip entries among them decode together.
+function _read_entries!(dest, ds::CDFDataset{RST}, entries, i, j, rec_first, rec_last, record_bytes, compression) where {RST}
+    i == j && return _read_entry!(dest, ds, entries[i], rec_first, rec_last, record_bytes, compression)
+    k1 = k2 = k3 = k4 = n = 0
+    for k in i:j
+        if compression == GzipCompression && _whole_compressed(entries[k], rec_first, rec_last)
+            n += 1
+            n == 1 ? (k1 = k) : n == 2 ? (k2 = k) : n == 3 ? (k3 = k) : (k4 = k)
+        else
+            _read_entry!(dest, ds, entries[k], rec_first, rec_last, record_bytes, compression)
+        end
+    end
+    job(k) = ((entries[k].first - rec_first) * record_bytes + 1, entries[k].offset, length(entries[k]) * record_bytes)
+    buffer = parent(ds)
+    n == 1 && load_cvvr_group!(dest, buffer, (job(k1),), RST)
+    n == 2 && load_cvvr_group!(dest, buffer, (job(k1), job(k2)), RST)
+    n == 3 && load_cvvr_group!(dest, buffer, (job(k1), job(k2), job(k3)), RST)
+    n == 4 && load_cvvr_group!(dest, buffer, (job(k1), job(k2), job(k3), job(k4)), RST)
+    return
+end
+
+_whole_compressed(e::VVREntry, rec_first, rec_last) = e.compressed && e.first >= rec_first && e.last <= rec_last
+
 function _read_entry!(dest, ds::CDFDataset{RST}, e::VVREntry, rec_first, rec_last, record_bytes, compression) where {RST}
     buffer = parent(ds)
     lo, hi = max(rec_first, e.first), min(rec_last, e.last)
@@ -271,7 +299,7 @@ function _read_entry!(dest, ds::CDFDataset{RST}, e::VVREntry, rec_first, rec_las
     skip = (lo - e.first) * record_bytes
     if !e.compressed
         load_vvr_data!(dest, doffs, buffer, e.offset + skip, nbytes, RST)
-    elseif skip == 0 && hi == e.last
+    elseif _whole_compressed(e, rec_first, rec_last)
         load_cvvr_data!(dest, doffs, buffer, e.offset, nbytes, RST, compression)
     else
         block = cached_block!(BLOCK_CACHE, (dataset_id(ds), e.offset)) do

@@ -37,8 +37,8 @@ let ds = CDFDataset(MMS_FILE), var = ds["mms1_scm_acb_gse_scsrvy_srvy_l2"]
     g["sum_var_access"] = @benchmarkable sum($var[:, 100:100000])
     g["full_load"] = @benchmarkable full_load(MMS_FILE)
     # One compressed block holds ~5400 records, so these read within one block.
-    g["index_element"] = @benchmarkable $var[2, 1_000_000]
-    g["index_small_slice"] = @benchmarkable $var[:, 1_000_000:1_000_100]
+    g["index_element"] = @benchmarkable for i in 1:100; $var[2, 1_000_000 + i]; end
+    g["index_small_slice"] = @benchmarkable for i in 1:100; $var[:, (1_000_000 + i):(1_000_100 + i)]; end
 end
 
 let file = joinpath(pkgdir(CommonDataFormat), "data", "a_compressed_cdf.cdf")
