@@ -1,6 +1,3 @@
-# Attribute loading functionality
-# Handles loading of ADR (Attribute Descriptor Record) and AEDR (Attribute Entry Descriptor Record) chains
-
 # Load all attribute entries for a given attribute from its AEDRs: rEntries, then zEntries.
 # Writers may chain AEDRs out of entry-number order, so each chain is ordered by entry number.
 @inline function load_attribute_entries(buffer::Vector{UInt8}, adr, ::Type{RecordSizeType}, needs_byte_swap) where {RecordSizeType}
@@ -19,116 +16,82 @@ end
 """
     attrib(cdf::CDFDataset)
 
-Load all attributes from the CDF file.
+Global attributes, each read on access.
 """
-function attrib(cdf::CDFDataset; predicate = is_global)
-    RecordSizeType = recordsize_type(cdf)
-    buffer = cdf.buffer
-    needs_byte_swap = is_big_endian_encoding(cdf)
-    result = Dict{String, Vector}()
-    for offset in OffsetsIterator(cdf)
-        adr = ADR{RecordSizeType}(buffer, offset)
-        predicate(adr) || continue
-        result[adr_name(buffer, adr)] = load_attribute_entries(buffer, adr, RecordSizeType, needs_byte_swap)
-    end
-    return result
-end
+attrib(cdf::CDFDataset) = LazyAttrib(cdf)
+attrib(cdf::CDFDataset, name::String) = attrib(cdf)[name]
 
-"""
-    attrib(cdf::CDFDataset, attribute_name::String)
-
-Retrieve all entries for a named attribute from the CDF file.
-"""
-function attrib(cdf::CDFDataset{FST}, name::String) where {FST}
-    buffer = cdf.buffer
-    needs_byte_swap = is_big_endian_encoding(cdf)
-    for offset in OffsetsIterator(cdf)
-        name_equals(buffer, _adr_name_pos(offset, FST), name, FST) &&
-            return load_attribute_entries(buffer, ADR{FST}(buffer, offset), FST, needs_byte_swap)
-    end
-    error("Attribute '$name' not found in CDF file")
-end
-
-# Lazy dict-like view of variable attributes; use Dict{String,Union{String,Vector}}(x) to materialize.
+# Lazy dict-like view of the global attributes (`varnum === nothing`) or of variable `varnum`'s.
 # r- and z-variables are numbered independently, so `zvar` selects the entry chain `varnum` indexes.
-struct LazyVAttrib{CDF, N} <: AbstractDict{String, Union{String, Vector}}
+struct LazyAttrib{CDF, N, V} <: AbstractDict{String, V}
     cdf::CDF
     varnum::N
     zvar::Bool
 end
 
-_entry_head(la::LazyVAttrib, adr) = la.zvar ? adr.AzEDRhead : adr.AgrEDRhead
+LazyAttrib(cdf) = LazyAttrib{typeof(cdf), Nothing, Vector}(cdf, nothing, false)
+LazyAttrib(cdf, varnum::Integer, zvar::Bool) = LazyAttrib{typeof(cdf), typeof(varnum), Union{String, Vector}}(cdf, varnum, zvar)
 
-function Base.iterate(la::LazyVAttrib, offset::Int = Int(la.cdf.gdr.ADRhead))
-    offset == 0 && return nothing
-    RecordSizeType = recordsize_type(la.cdf)
-    buffer = la.cdf.buffer
-    needs_byte_swap = is_big_endian_encoding(la.cdf)
-    while offset != 0
-        # cheap scope check before parsing the full ADR (avoids Name string allocation for globals)
-        if is_global(buffer, offset, RecordSizeType)
-            offset = next_record_offset(buffer, offset, RecordSizeType)
-            continue
-        end
-        adr = ADR{RecordSizeType}(buffer, offset)
-        next_offset = Int(adr.ADRnext)
-        found = _search_aedr_entries(buffer, _entry_head(la, adr), RecordSizeType, needs_byte_swap, la.varnum)
-        if !isnothing(found)
-            return (adr_name(buffer, adr) => found, next_offset)
-        end
-        offset = next_offset
+@inline _in_scope(la::LazyAttrib, buffer, offset, ::Type{RecordSizeType}) where {RecordSizeType} = is_global(buffer, offset, RecordSizeType) == isnothing(la.varnum)
+
+# A global attribute holds all its entries; a variable attribute may have no entry for `varnum`.
+@inline function _entries(la::LazyAttrib, buffer, adr, ::Type{RecordSizeType}, needs_byte_swap) where {RecordSizeType}
+    isnothing(la.varnum) && return load_attribute_entries(buffer, adr, RecordSizeType, needs_byte_swap)
+    for offset in OffsetsIterator{RecordSizeType}(buffer, la.zvar ? adr.AzEDRhead : adr.AgrEDRhead)
+        aedr_num(buffer, offset, RecordSizeType) == la.varnum &&
+            return load_aedr_data(buffer, offset, RecordSizeType, needs_byte_swap)
     end
     return nothing
 end
 
-Base.IteratorSize(::Type{<:LazyVAttrib}) = Base.SizeUnknown()
-Base.length(la::LazyVAttrib) = count(_ -> true, la)
+# First in-scope ADR from `offset` (named `name`, if given) with entries or nothing
+@inline function _find_adr(la::LazyAttrib, offset::Int, name = nothing)
+    RecordSizeType = recordsize_type(la.cdf)
+    buffer = la.cdf.buffer
+    needs_byte_swap = is_big_endian_encoding(la.cdf)
+    while offset != 0
+        if _in_scope(la, buffer, offset, RecordSizeType) &&
+                (isnothing(name) || name_equals(buffer, _adr_name_pos(offset, RecordSizeType), name, RecordSizeType))
+            adr = ADR{RecordSizeType}(buffer, offset)
+            found = _entries(la, buffer, adr, RecordSizeType, needs_byte_swap)
+            isnothing(found) || return (adr, found)
+            isnothing(name) || return nothing # names are unique
+        end
+        offset = next_record_offset(buffer, offset, RecordSizeType)
+    end
+    return nothing
+end
 
-function Base.getindex(la::LazyVAttrib, name::AbstractString)
+function Base.iterate(la::LazyAttrib, offset::Int = Int(la.cdf.gdr.ADRhead))
+    r = _find_adr(la, offset)
+    isnothing(r) && return nothing
+    adr, found = r
+    return (Pair{String, valtype(la)}(adr_name(la.cdf.buffer, adr), found), Int(adr.ADRnext))
+end
+
+Base.IteratorSize(::Type{<:LazyAttrib{<:Any, <:Integer}}) = Base.SizeUnknown()
+function Base.length(la::LazyAttrib)
+    isnothing(la.varnum) || return count(Returns(true), la)
+    buffer, RecordSizeType = la.cdf.buffer, recordsize_type(la.cdf)
+    return count(offset -> is_global(buffer, offset, RecordSizeType), OffsetsIterator(la.cdf))
+end
+
+function Base.getindex(la::LazyAttrib, name::AbstractString)
     at = get(la, name, nothing)
     isnothing(at) && throw(KeyError(name))
     return at
 end
 
-function Base.get(la::LazyVAttrib, name::AbstractString, default = nothing)
-    cdf = la.cdf
-    varnum = la.varnum
-    RecordSizeType = recordsize_type(cdf)
-    buffer = cdf.buffer
-    name_str = String(name)
-    needs_byte_swap = is_big_endian_encoding(cdf)
-    for offset in OffsetsIterator(cdf)
-        is_global(buffer, offset, RecordSizeType) && continue
-        name_equals(buffer, _adr_name_pos(offset, RecordSizeType), name_str, RecordSizeType) || continue
-        adr = ADR{RecordSizeType}(buffer, offset)
-        found = _search_aedr_entries(buffer, _entry_head(la, adr), RecordSizeType, needs_byte_swap, varnum)
-        return isnothing(found) ? default : found
-    end
-    return default
+function Base.get(la::LazyAttrib, name::AbstractString, default = nothing)
+    r = _find_adr(la, Int(la.cdf.gdr.ADRhead), String(name))
+    return isnothing(r) ? default : r[2]
 end
 
-Base.get(la::LazyVAttrib, name, default = nothing) = default
+Base.get(la::LazyAttrib, name, default = nothing) = default
 
-Base.haskey(la::LazyVAttrib, name::AbstractString) = !isnothing(get(la, name, nothing))
-Base.haskey(la::LazyVAttrib, name) = false
+Base.haskey(la::LazyAttrib, name::AbstractString) = !isnothing(get(la, name, nothing))
+Base.haskey(la::LazyAttrib, name) = false
 
-@inline function _search_aedr_entries(source, aedr_head, ::Type{RecordSizeType}, needs_byte_swap, target_varnum) where {RecordSizeType}
-    aedr_head == 0 && return nothing
-    offset = Int(aedr_head)
-    while offset != 0
-        if aedr_num(source, offset, RecordSizeType) == target_varnum
-            return load_aedr_data(source, offset, RecordSizeType, needs_byte_swap)
-        end
-        offset = next_record_offset(source, offset, RecordSizeType)
-    end
-    return nothing
-end
-
-"""
-    attribnames(cdf::CDFDataset)
-
-Return a list of attribute names in the CDF file.
-"""
 function attribnames(cdf::CDFDataset{FST}; predicate = is_global) where {FST}
     names = String[]
     buffer = cdf.buffer

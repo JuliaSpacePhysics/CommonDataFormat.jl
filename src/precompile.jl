@@ -4,7 +4,7 @@ PrecompileTools.@setup_workload begin
     PrecompileTools.@compile_workload begin
         for file in files
             ds = CDFDataset(file)
-            ds.attrib
+            get(ds.attrib, "Logical_source", nothing)
             for var in ds
                 isempty(var) && continue
                 Dict(var.attrib)

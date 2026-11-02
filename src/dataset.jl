@@ -106,7 +106,6 @@ majority(cdf::CDFDataset) = majority(cdf.cdr)
     name === :majority && return majority(cdf)
     name === :adr && return ADR{recordsize_type(cdf)}(parent(cdf), GDR(cdf).ADRhead)
     name === :attrib && return attrib(cdf)
-    name === :vattrib && return attrib(cdf; predicate = !is_global)
     throw(ArgumentError("Unknown property $name"))
 end
 
