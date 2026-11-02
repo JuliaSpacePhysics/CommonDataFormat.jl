@@ -130,6 +130,11 @@ end
 function _fill_strings!(dest::Vector{String}, bytes::Vector{UInt8}, w::Int)
     GC.@preserve bytes for k in eachindex(dest)
         o = (k - 1) * w
+        # Per-record flags repeat for long runs, so share the previous String when possible.
+        if k > 1 && ccall(:memcmp, Cint, (Ptr{UInt8}, Ptr{UInt8}, Csize_t), pointer(bytes, o + 1), pointer(bytes, o + 1 - w), w) == 0
+            dest[k] = dest[k - 1]
+            continue
+        end
         n = w
         while n > 0 && iszero(@inbounds bytes[o + n])
             n -= 1
