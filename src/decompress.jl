@@ -1,5 +1,4 @@
 include("decompress/rle.jl")
-include("decompress/gzip.jl")
 
 
 function decompress_bytes(buffer, ::Type{RecordSizeType}) where {RecordSizeType}
@@ -21,11 +20,7 @@ function decompress_bytes!(dest, doffs, src::AbstractVector{UInt8}, soffs, N, n_
         _copy_to!(dest, doffs, src, soffs, N)
     elseif compression == GzipCompression
         checkbounds(src, soffs:(soffs + n_in - 1))
-        GC.@preserve dest src begin
-            out = _with_decompressor(d -> _unsafe_gzip_decompress!(d, pointer(dest, doffs), n_out, pointer(src, soffs), n_in))
-            out isa LibDeflateError && throw(ArgumentError("gzip decompression failed"))
-            out == n_out || throw(ArgumentError("Decompressed payload size mismatch (expected $n_out, got $out)"))
-        end
+        GC.@preserve dest src gzip_decompress!(Ptr{UInt8}(pointer(dest, doffs)), n_out, pointer(src, soffs), n_in)
     elseif compression == RLECompression
         out = _rle_decompress(view(src, soffs:(soffs + n_in - 1)), n_out)
         _copy_to!(dest, doffs, out, 1, N)
