@@ -36,8 +36,7 @@ Load a z- or r-Variable Descriptor Record from the buffer at the specified offse
     record_type = get_record_type(buffer, offset, FieldSizeT)
     @assert record_type in (8, 3)
     zvar = record_type == 8
-    pos = offset + sizeof(FieldSizeT) + 5
-    head, pos = read_be_fields(buffer, pos, VDR{FieldSizeT}, Val(1:10))
+    head, pos = read_be_fields(buffer, _after_header(offset, FieldSizeT), VDR{FieldSizeT}, Val(1:10))
     tail, _ = read_be_fields(buffer, pos + pad, VDR{FieldSizeT}, Val(11:13))
     fields = (head..., tail...)
     after_name = _after_name(offset, FieldSizeT) + pad

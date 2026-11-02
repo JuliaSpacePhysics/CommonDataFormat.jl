@@ -40,10 +40,8 @@ end
     CDF_UCHAR = 52
 end
 
-Base.:(==)(x::RecordType, y::T) where {T <: Integer} = T(x) == y
-Base.:(==)(x::T, y::RecordType) where {T <: Integer} = x == T(y)
-Base.:(==)(x::CDFDataType, y::T) where {T <: Integer} = T(x) == y
-Base.:(==)(x::T, y::CDFDataType) where {T <: Integer} = x == T(y)
+Base.:(==)(x::Union{RecordType, CDFDataType}, y::T) where {T <: Integer} = T(x) == y
+Base.:(==)(x::T, y::Union{RecordType, CDFDataType}) where {T <: Integer} = x == T(y)
 
 # code → eltype for fixed-size types ordered roughly by frequency
 const CODE_TYPE_PAIRS = (

@@ -123,23 +123,18 @@ end
 function Base.read!(var::CDFVariable{T,N}, dest::AbstractArray{T}, ranges::Vararg{AbstractUnitRange{<:Integer},N}) where {T,N}
     _check_region(var, dest, ranges)
     isempty(dest) && return dest
-    if !(dest isa Array)
-        copyto!(dest, read!(var, Array{T}(undef, size(dest)), ranges...))
-        return dest
-    end
+    dest isa Array || return copyto!(dest, read!(var, Array{T}(undef, size(dest)), ranges...))
+    return _read_array!(var, dest, ranges)
+end
+
+function _read_array!(var::CDFVariable{T}, dest::Array{T}, ranges) where {T}
     GC.@preserve dest _read_region!(Ptr{UInt8}(_ptr(dest)), sizeof(T), var, ranges)
     is_big_endian_encoding(var) && _byte_swap!(dest)
     return dest
 end
 
 # CHAR elements are `num_elems`-byte fields, null-padded; the string ends at the trailing-null run.
-function Base.read!(var::CDFVariable{String,N}, dest::AbstractArray{String}, ranges::Vararg{AbstractUnitRange{<:Integer},N}) where {N}
-    _check_region(var, dest, ranges)
-    isempty(dest) && return dest
-    if !(dest isa Array)
-        copyto!(dest, read!(var, Array{String}(undef, size(dest)), ranges...))
-        return dest
-    end
+function _read_array!(var::CDFVariable{String}, dest::Array{String}, ranges)
     w = Int(var.vdr.num_elems)
     bytes = Vector{UInt8}(undef, w * length(dest))
     GC.@preserve bytes _read_region!(pointer(bytes), w, var, ranges)

@@ -58,7 +58,7 @@ function gzip_dataset(spans)
         append!(buffer, zeros(UInt8, 16), reinterpret(UInt8, [hton(Int64(length(gz)))]), gz)
     end
     template = CDFDataset(data_path("a_cdf.cdf"))
-    ds = CDFDataset{Int64}("", getfield(template, :cdr), getfield(template, :gdr), buffer, CDF.NoCompression, -1, Dict{Int,Tuple{Vector{CDF.VVREntry},CDF.CompressionType}}(), ReentrantLock())
+    ds = CDFDataset{Int64}("", getfield(template, :cdr), getfield(template, :gdr), buffer, CDF.NoCompression, -1, CDF.RecordIndex(), ReentrantLock())
     return ds, entries
 end
 

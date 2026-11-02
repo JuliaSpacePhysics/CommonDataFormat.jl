@@ -110,9 +110,10 @@ Base.convert(::Type{Timestamp{P}}, x::Union{TT2000, Epoch16}) where {P} = conver
 Base.convert(::Type{Timestamp{P}}, x::Epoch) where {P} = convert(Timestamp{P}, DateTime(x))
 Base.convert(::Type{DateTime}, x::CDFDateTime) = DateTime(x)
 
-TT2000(dt::TimeType) = convert(TT2000, dt)
-Epoch(dt::TimeType) = convert(Epoch, dt)
-Epoch16(dt::TimeType) = convert(Epoch16, dt)
+for t in (:Epoch, :Epoch16, :TT2000)
+    @eval $t(dt::TimeType) = convert($t, dt)
+    @eval Base.convert(::Type{$t}, dt::$t) = dt
+end
 
 Base.convert(::Type{TT2000}, dt::TimeType) = _tt2000(_unix_ns(dt))
 _tt2000(ns_since_unix) = TT2000(Int64(ns_since_unix - TT2000_OFFSET + leap_second(ns_since_unix)))
@@ -131,10 +132,6 @@ end
 function Base.convert(::Type{Epoch}, dt::TimeType)
     ms_since_unix = (DateTime(dt) - DateTime(1970, 1, 1)).value
     return Epoch(ms_since_unix + EPOCH_OFFSET_MILLISECONDS)
-end
-
-for t in (:Epoch, :Epoch16, :TT2000)
-    @eval Base.convert(::Type{$t}, dt::$t) = dt
 end
 
 for f in (:Date, :Time, :days, :year, :month, :day, :hour, :minute, :second, :millisecond)
