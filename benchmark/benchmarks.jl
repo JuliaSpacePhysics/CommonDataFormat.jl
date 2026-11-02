@@ -41,6 +41,11 @@ let ds = CDFDataset(MMS_FILE), var = ds["mms1_scm_acb_gse_scsrvy_srvy_l2"]
     g["index_small_slice"] = @benchmarkable $var[:, 1_000_000:1_000_100]
 end
 
+let file = joinpath(pkgdir(CommonDataFormat), "data", "a_compressed_cdf.cdf")
+    g = SUITE["whole_file_compression"] = BenchmarkGroup()
+    g["open_gzip"] = @benchmarkable CDFDataset($file)
+end
+
 # Inputs stay within what every epoch type could always represent (millisecond strings, modern
 # dates) so the suite also runs on older revisions for comparison.
 let tt = TT2000(DateTime(2020)) .+ Millisecond.(1:10_000), dt = DateTime.(tt),
