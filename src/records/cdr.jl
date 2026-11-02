@@ -19,7 +19,6 @@ end
 
 version(cdr::CDR; verbose = true) = verbose ? (cdr.version, cdr.release, cdr.increment) : cdr.version
 majority(cdr::CDR) = (cdr.flags & 0x01) != 0 ? Row : Column  # Row=0, Column=1
-is_cdf_v3(cdr::CDR) = cdr.version == 3
 
 @inline function CDR{FST}(buffer::Vector{UInt8}, offset) where {FST}
     pos = check_record_type(1, buffer, offset, FST)

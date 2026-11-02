@@ -11,10 +11,8 @@ _after_header(offset, ::Type{FieldSizeT}) where {FieldSizeT} = offset + sizeof(F
 next_record_offset(buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT} = Int(read_be(buffer, _after_header(offset, FieldSizeT), FieldSizeT))
 
 @inline function check_record_type(record_type::Integer, buffer, offset, ::Type{FieldSizeT}) where {FieldSizeT}
-    pos = offset + sizeof(FieldSizeT) + 1
-    header_type = read_be(buffer, pos, Int32)
-    @assert header_type == record_type
-    return pos + sizeof(Int32)
+    @assert get_record_type(buffer, offset, FieldSizeT) == record_type
+    return _after_header(offset, FieldSizeT)
 end
 
 include("cdr.jl")

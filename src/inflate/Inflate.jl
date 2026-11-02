@@ -96,6 +96,12 @@ function reset!(s::Stream, out::Ptr{UInt8}, outlen::Int, inp::Ptr{UInt8}, inlen:
     return s
 end
 
+# Bit-reversed increment of a codeword
+@inline function next_codeword(codeword::Int, all_ones::Int)
+    bit = 1 << (63 - leading_zeros(codeword ⊻ all_ones))
+    return (codeword & (bit - 1)) | bit
+end
+
 # Canonical Huffman decode table for `lens[lo+1:lo+nsyms]`; false if the code is invalid.
 # Incomplete codes are accepted (as zlib does) only with zero codewords or a single 1-bit one.
 # Follows libdeflate's build_decode_table: each codeword is written once and the table is
@@ -179,8 +185,7 @@ function build_table!(s::Stream, table::Vector{UInt32}, lo::Int, nsyms::Int, res
                     end
                     return true
                 end
-                bit = 1 << (63 - leading_zeros(codeword ⊻ (cur_end - 1)))  # bit-reversed increment
-                codeword = (codeword & (bit - 1)) | bit
+                codeword = next_codeword(codeword, cur_end - 1)
                 (remaining -= 1) == 0 && break
             end
             while true
@@ -220,8 +225,7 @@ function build_table!(s::Stream, table::Vector{UInt32}, lo::Int, nsyms::Int, res
                 i += 1 << rl
             end
             codeword == (1 << len) - 1 && return true
-            bit = 1 << (63 - leading_zeros(codeword ⊻ ((1 << len) - 1)))
-            codeword = (codeword & (bit - 1)) | bit
+            codeword = next_codeword(codeword, (1 << len) - 1)
             remaining -= 1
             while remaining == 0
                 len += 1
@@ -333,6 +337,19 @@ end
 end
 
 @inline litentry(lit::Ptr{UInt32}, r::Regs) = tload(lit, r.bitbuf & ((1 << LITLEN_TABLEBITS) - 1))
+@inline offentry(off::Ptr{UInt32}, r::Regs) = tload(off, r.bitbuf & ((1 << OFFSET_TABLEBITS) - 1))
+
+# Consume subtable pointer `e` and look up the rest of the codeword.
+@inline function enter_subtable(t::Ptr{UInt32}, r::Regs, e::UInt32)
+    r = consume(r, e)
+    return r, tload(t, UInt64(e >> 16) + lowbits(r.bitbuf, UInt64((e >> 8) & 0xf)))
+end
+
+# Consume length/offset entry `e`; its value is the base plus the extra bits above the codeword.
+@inline function take_value(r::Regs, e::UInt32)
+    extra = lowbits(r.bitbuf, UInt64(e & 0x1f)) >> ((e >> 8) & 0xf)
+    return consume(r, e), UInt64(e >> 16) + extra
+end
 
 # One fast-loop step: ≤ 3 literals or one match. Entries are looked up before the refill
 # they follow, taking it off the dependency chain: a fast refill leaves 64 real bits in
@@ -354,8 +371,7 @@ end
     end
     if e & EXCEPTIONAL != 0
         if e & SUBTABLE != 0
-            r = consume(r, e)
-            e = tload(lit, UInt64(e >> 16) + lowbits(r.bitbuf, UInt64((e >> 8) & 0xf)))
+            r, e = enter_subtable(lit, r, e)
             if e & LITERAL != 0
                 r = put_literal(r, e)
                 return r, litentry(lit, r), OK
@@ -366,30 +382,23 @@ end
         return consume(r, e), e, EOB
     end
     @label length
-    saved = r.bitbuf
-    n = UInt64(e & 0x1f)
-    r = consume(r, e)
-    len = UInt64(e >> 16) + (lowbits(saved, n) >> ((e >> 8) & 0xf))
-    e = tload(off, r.bitbuf & ((1 << OFFSET_TABLEBITS) - 1))
+    r, len = take_value(r, e)
+    e = offentry(off, r)
     r = refill_fast(r)
-    if e & SUBTABLE != 0
-        r = consume(r, e)
-        e = tload(off, UInt64(e >> 16) + lowbits(r.bitbuf, UInt64((e >> 8) & 0xf)))
-    end
+    e & SUBTABLE != 0 && ((r, e) = enter_subtable(off, r, e))
     e & EXCEPTIONAL != 0 && return r, e, BAD
-    saved = r.bitbuf
-    n = UInt64(e & 0x1f)
-    r = consume(r, e)
-    dist = UInt64(e >> 16) + (lowbits(saved, n) >> ((e >> 8) & 0xf))
+    r, dist = take_value(r, e)
     dist > UInt64(r.out - out_start) && return r, e, BAD
     copy_match(r.out, dist, len)
     r = Regs(r.bitbuf, r.bitsleft, r.inp, r.out + len)
     return r, litentry(lit, r), OK
 end
 
+end_block!(s::Stream) = (s.state = s.final ? DONE : HEADER)
+
 function after_step!(s::Stream, status::Int)
     status == BAD && bad("invalid deflate data")
-    status == EOB && (s.state = s.final ? DONE : HEADER)
+    status == EOB && end_block!(s)
     return
 end
 
@@ -425,11 +434,8 @@ function run_slow!(s::Stream)
     r = regs(s)
     while true
         r = refill(r, s)
-        e = tload(lit, r.bitbuf & ((1 << LITLEN_TABLEBITS) - 1))
-        if e & SUBTABLE != 0
-            r = consume(r, e)
-            e = tload(lit, UInt64(e >> 16) + lowbits(r.bitbuf, UInt64((e >> 8) & 0xf)))
-        end
+        e = litentry(lit, r)
+        e & SUBTABLE != 0 && ((r, e) = enter_subtable(lit, r, e))
         if e & LITERAL != 0
             r.out < s.out_end || bad("deflate output exceeds expected size")
             r = put_literal(r, e)
@@ -440,21 +446,12 @@ function run_slow!(s::Stream)
             r = consume(r, e)
             break
         end
-        saved = r.bitbuf
-        n = UInt64(e & 0x1f)
-        r = consume(r, e)
-        len = UInt64(e >> 16) + (lowbits(saved, n) >> ((e >> 8) & 0xf))
+        r, len = take_value(r, e)
         r = refill(r, s)
-        e = tload(off, r.bitbuf & ((1 << OFFSET_TABLEBITS) - 1))
-        if e & SUBTABLE != 0
-            r = consume(r, e)
-            e = tload(off, UInt64(e >> 16) + lowbits(r.bitbuf, UInt64((e >> 8) & 0xf)))
-        end
+        e = offentry(off, r)
+        e & SUBTABLE != 0 && ((r, e) = enter_subtable(off, r, e))
         e & EXCEPTIONAL != 0 && bad("invalid offset symbol")
-        saved = r.bitbuf
-        n = UInt64(e & 0x1f)
-        r = consume(r, e)
-        dist = UInt64(e >> 16) + (lowbits(saved, n) >> ((e >> 8) & 0xf))
+        r, dist = take_value(r, e)
         dist > UInt64(r.out - s.out_start) && bad("match distance too far back")
         len > UInt64(s.out_end - r.out) && bad("deflate output exceeds expected size")
         # Near the input end of a highly compressed stream this loop still emits most bytes.
@@ -469,7 +466,7 @@ function run_slow!(s::Stream)
         r = Regs(r.bitbuf, r.bitsleft, r.inp, r.out + len)
     end
     store!(s, r)
-    s.state = s.final ? DONE : HEADER
+    end_block!(s)
     return
 end
 
@@ -480,7 +477,7 @@ function read_header!(s::Stream)
     r = consume(r, UInt64(3))
     if btype == 0
         r = stored_block!(s, r)
-        s.state = s.final ? DONE : HEADER
+        end_block!(s)
     elseif btype == 1
         s.lit, s.off = pointer(FIXED_LIT), pointer(FIXED_OFF)
         s.state = HUFFMAN
@@ -495,6 +492,12 @@ function read_header!(s::Stream)
     return
 end
 
+function next_input(s::Stream, r::Regs)
+    buffered = Int(r.bitsleft >> 3) - s.overread
+    buffered < 0 && bad("truncated deflate stream")
+    return r.inp - buffered
+end
+
 function stored_block!(s::Stream, r::Regs)
     r = consume(r, r.bitsleft & 7)
     r = refill(r, s)
@@ -502,9 +505,7 @@ function stored_block!(s::Stream, r::Regs)
     nlen = Int((r.bitbuf >> 16) & 0xffff)
     nlen == xor(len, 0xffff) || bad("corrupt stored block length")
     r = consume(r, UInt64(32))
-    buffered = Int(r.bitsleft >> 3) - s.overread
-    buffered < 0 && bad("truncated deflate stream")
-    inp = r.inp - buffered
+    inp = next_input(s, r)
     len <= s.in_end - inp || bad("truncated stored block")
     len <= s.out_end - r.out || bad("deflate output exceeds expected size")
     unsafe_copyto!(r.out, inp, len)
@@ -623,9 +624,7 @@ end
 
 function gzip_finish(s::Stream, outlen::Int)
     s.out == s.out_end || bad("decompressed size mismatch")
-    buffered = Int(s.bitsleft >> 3) - s.overread
-    buffered < 0 && bad("truncated deflate stream")
-    trailer = s.inp - buffered
+    trailer = next_input(s, regs(s))
     crc = ltoh(unsafe_load(Ptr{UInt32}(trailer)))
     isize = ltoh(unsafe_load(Ptr{UInt32}(trailer + 4)))
     isize == outlen % UInt32 || bad("gzip ISIZE mismatch")

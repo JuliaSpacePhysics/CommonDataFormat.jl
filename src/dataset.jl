@@ -1,13 +1,15 @@
+const BlockEntry = Pair{Tuple{Int,Int},Vector{UInt8}}
+
 # Decompressed blocks of all open datasets, least recently used first
 # Keyed by (dataset id, VVR offset) so memory doesn't grow with open files.
 mutable struct BlockCache
     const lock::ReentrantLock
-    const entries::Vector{Pair{Tuple{Int,Int},Vector{UInt8}}}
+    const entries::Vector{BlockEntry}
     nbytes::Int
     const maxbytes::Int
     const maxcount::Int  # bounds the key scan
 end
-BlockCache(maxbytes, maxcount) = BlockCache(ReentrantLock(), Pair{Tuple{Int,Int},Vector{UInt8}}[], 0, maxbytes, maxcount)
+BlockCache(maxbytes, maxcount) = BlockCache(ReentrantLock(), BlockEntry[], 0, maxbytes, maxcount)
 const BLOCK_CACHE = BlockCache(1 << 27, 64)
 const DATASET_IDS = Threads.Atomic{Int}(0)
 
@@ -37,6 +39,8 @@ function cached_block!(f, c::BlockCache, key::Tuple{Int,Int})
     return block
 end
 
+const RecordIndex = Dict{Int,Tuple{Vector{VVREntry},CompressionType}}
+
 struct CDFDataset{FST}
     filename::String
     cdr::CDR{FST}
@@ -44,7 +48,7 @@ struct CDFDataset{FST}
     buffer::Vector{UInt8}
     compression::CompressionType
     id::Int
-    record_index::Dict{Int,Tuple{Vector{VVREntry},CompressionType}}
+    record_index::RecordIndex
     record_index_lock::ReentrantLock
 end
 
@@ -88,7 +92,7 @@ function CDFDataset{FST}(fname, buffer) where {FST}
     end
     cdr = CDR{FST}(buffer, 8)
     gdr = GDR{FST}(buffer, Int(cdr.gdr_offset))
-    return CDFDataset{FST}(fname, cdr, gdr, buffer, compression, Threads.atomic_add!(DATASET_IDS, 1), Dict{Int,Tuple{Vector{VVREntry},CompressionType}}(), ReentrantLock())
+    return CDFDataset{FST}(fname, cdr, gdr, buffer, compression, Threads.atomic_add!(DATASET_IDS, 1), RecordIndex(), ReentrantLock())
 end
 
 Base.close(cdf::CDFDataset) = (evict_dataset!(BLOCK_CACHE, dataset_id(cdf)); finalize(parent(cdf)); nothing)
