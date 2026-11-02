@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.2] - 2026-11-01
+
+### Changed
+
+- Faster gzip reads: built-in decoder that inflates up to 4 blocks in lockstep.
+
 ## [0.6.0] - 2026-11-01
 
 ### Changed
