@@ -50,5 +50,3 @@ function _with_decompressor(f)
         put!(decompressors(), decompressor)
     end
 end
-
-_unsafe_gzip_decompress!(::Nothing, args...) = _with_decompressor(d -> _unsafe_gzip_decompress!(d, args...))

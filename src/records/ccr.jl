@@ -12,13 +12,7 @@ end
     cpr_offset, pos = read_be_i(buffer, pos, RecordSizeType)
     uncompressed_size, pos = read_be_i(buffer, pos, RecordSizeType)
     rfu_a, data_offset = read_be_i(buffer, pos, RInt32)
-    data_length = record_end - data_offset
-    @assert data_length >= 0 "Invalid CCR data length"
+    data_length = record_end - data_offset + 1
+    @assert data_length > 0 "Invalid CCR data length"
     return CCR(UInt64(cpr_offset), UInt64(uncompressed_size), rfu_a, data_offset, data_length)
-end
-
-@inline function data_view(ccr::CCR, buffer::Vector{UInt8})
-    start = ccr.data_offset
-    stop = start + ccr.data_length
-    return view(buffer, (start):(stop))
 end

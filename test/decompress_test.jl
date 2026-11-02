@@ -1,6 +1,6 @@
 # Variable-level (CVVR) decompression. No CDF writer in the ecosystem emits
 # RLE-compressed variables (cdflib/pycdf are gzip-only), so build CVVRs by hand.
-using CommonDataFormat: load_cvvr_data!, decompress_bytes!, Decompressor,
+using CommonDataFormat: load_cvvr_data!, decompress_bytes!,
     RLECompression, HuffmanCompression, NoCompression
 
 # CDF RLE: 0x00 followed by (run_length - 1); other bytes literal
@@ -55,5 +55,5 @@ end
 @testset "unsupported variable compression" begin
     src = zeros(UInt8, 16)
     dest = Vector{Float64}(undef, 1)
-    @test_throws ArgumentError decompress_bytes!(Decompressor(), dest, 1, src, 1, 1, 8, HuffmanCompression)
+    @test_throws ArgumentError decompress_bytes!(dest, 1, src, 1, 1, 8, HuffmanCompression)
 end
