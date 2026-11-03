@@ -34,12 +34,31 @@ LazyAttrib(cdf, varnum::Integer, zvar::Bool) = LazyAttrib{typeof(cdf), typeof(va
 
 @inline _in_scope(la::LazyAttrib, buffer, offset, ::Type{RecordSizeType}) where {RecordSizeType} = is_global(buffer, offset, RecordSizeType) == isnothing(la.varnum)
 
+# Offset of variable `varnum`'s entry for this attribute, if it has one.
+function _entry_offset(buffer, adr, varnum, zvar, ::Type{RecordSizeType}) where {RecordSizeType}
+    for offset in OffsetsIterator{RecordSizeType}(buffer, zvar ? adr.AzEDRhead : adr.AgrEDRhead)
+        aedr_num(buffer, offset, RecordSizeType) == varnum && return offset
+    end
+    return nothing
+end
+
 # A global attribute holds all its entries; a variable attribute may have no entry for `varnum`.
 @inline function _entries(la::LazyAttrib, buffer, adr, ::Type{RecordSizeType}, needs_byte_swap) where {RecordSizeType}
     isnothing(la.varnum) && return load_attribute_entries(buffer, adr, RecordSizeType, needs_byte_swap)
-    for offset in OffsetsIterator{RecordSizeType}(buffer, la.zvar ? adr.AzEDRhead : adr.AgrEDRhead)
-        aedr_num(buffer, offset, RecordSizeType) == la.varnum &&
-            return load_aedr_data(buffer, offset, RecordSizeType, needs_byte_swap)
+    offset = _entry_offset(buffer, adr, la.varnum, la.zvar, RecordSizeType)
+    return isnothing(offset) ? nothing : load_aedr_data(buffer, offset, RecordSizeType, needs_byte_swap)
+end
+
+# The variable's FILLVAL as stored, if its type has the size of the variable's and it fills one `esz`-byte element.
+function fillval_bytes(vdr, cdf::CDFDataset{FST}, esz) where {FST}
+    buffer = parent(cdf)
+    for adr_offset in OffsetsIterator(cdf)
+        !is_global(buffer, adr_offset, FST) && name_equals(buffer, _adr_name_pos(adr_offset, FST), "FILLVAL", FST) || continue
+        offset = _entry_offset(buffer, ADR{FST}(buffer, adr_offset), vdr.num, vdr.zvar, FST)
+        isnothing(offset) && return nothing
+        datatype, NumElems, pos = aedr_value(buffer, offset, FST)
+        type_size(datatype) == type_size(vdr.data_type) && NumElems * type_size(datatype) == esz || return nothing
+        return buffer[pos:(pos + esz - 1)]
     end
     return nothing
 end

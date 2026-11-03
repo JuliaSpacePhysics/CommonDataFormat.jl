@@ -55,3 +55,5 @@ const CODE_TYPE_PAIRS = (
 const type_map = Dict{CDFDataType, Type}(CDFDataType(c) => T for (c, T) in CODE_TYPE_PAIRS)
 
 julia_type(cdf_type) = type_map[CDFDataType(cdf_type)]
+
+type_size(code) = (T = julia_type(code); T === String ? 1 : sizeof(T))

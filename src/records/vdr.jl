@@ -52,8 +52,7 @@ function _dim_layout(vdr::VDR{FST}, cdf) where {FST}
     return Int(gdr.r_num_dims), gdr.pos + sizeof(FST) + 3 * sizeof(Int32), vdr.pos
 end
 
-# PadValue (one element, file encoding) trails DimVarys; without one, the NASA library's
-# default, which is not the ISTP FILLVAL.
+# PadValue (one element, file encoding) trails DimVarys; without one, the NASA library's default.
 function pad_bytes(vdr::VDR, cdf, esz)
     if has_pad_value(vdr)
         n, _, varys_pos = _dim_layout(vdr, cdf)

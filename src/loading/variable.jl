@@ -199,7 +199,7 @@ function _read_region!(dest, esz, var::CDFVariable, ranges)
 end
 
 function _read_region!(sink::RecordSink, rec_range::UnitRange{Int}, vdr, ds::CDFDataset, entries::Vector{VVREntry}, compression::CompressionType)
-    virtual = _covers(entries, rec_range) ? NO_VIRTUAL : VirtualRecords(vdr.s_records == 2, pad_bytes(vdr, ds, sink.esz))
+    virtual = _covers(entries, rec_range) ? NO_VIRTUAL : VirtualRecords(vdr.s_records == 2, missing_value(vdr, ds, sink.esz))
     _read_records!(sink, ds, entries, first(rec_range), last(rec_range), compression, virtual)
     return
 end
@@ -214,13 +214,16 @@ end
 # Records absent from the VXR tree are virtual: sparse variables (sRecords) or records
 # never written. Previous-record sparse repeats the last physical record before the gap;
 # everything else, including a prev-sparse gap with no physical record before it, reads
-# as the pad value.
+# as `missing_value`.
 struct VirtualRecords
     prev::Bool
-    pad::Vector{UInt8}  # one element, in file encoding so the final byte swap covers it
+    value::Vector{UInt8}  # one element, in file encoding so the final byte swap covers it
 end
 
 const NO_VIRTUAL = VirtualRecords(false, UInt8[])
+
+# NASA's library since 3.8 prefers FILLVAL to the pad value.
+missing_value(vdr, ds, esz) = @something(fillval_bytes(vdr, ds, esz), pad_bytes(vdr, ds, esz))
 
 # Entries are sorted and disjoint, so both `first` and `last` increase
 _entry_first(x) = x isa VVREntry ? x.first : x
@@ -287,10 +290,10 @@ function _fill_virtual!(sink, ds, entries, prev_idx, skip, n, compression, virtu
         e = entries[prev_idx]
         _read_span!(sink, UInt8[], ds, e, e.last, e.last, skip, compression)
     else
-        pad = virtual.pad
-        esz = length(pad)
-        GC.@preserve pad for k in 0:esz:(out - 1)
-            unsafe_copyto!(first_rec + k, pointer(pad), esz)
+        value = virtual.value
+        esz = length(value)
+        GC.@preserve value for k in 0:esz:(out - 1)
+            unsafe_copyto!(first_rec + k, pointer(value), esz)
         end
     end
     for j in 1:(n - 1)
