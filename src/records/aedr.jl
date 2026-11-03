@@ -24,16 +24,18 @@ end
 aedr_num(buffer, offset, ::Type{RecordSizeType}) where {RecordSizeType} =
     read_be(buffer, offset + 13 + 2 * sizeof(RecordSizeType), Int32)
 
+# (data type, number of elements, position of the value)
+function aedr_value(buffer, offset, ::Type{RecordSizeType}) where {RecordSizeType}
+    base = offset + 2 * sizeof(RecordSizeType)
+    return read_be(buffer, base + 9, Int32), read_be(buffer, base + 17, Int32), base + 41
+end
+
 function load_aedr_data(buffer::Vector{UInt8}, offset, ::Type{RecordSizeType}, needs_byte_swap) where {RecordSizeType}
-    _datatype_offset = 9 + 2 * sizeof(RecordSizeType)
-    _numelems_offset = 17 + 2 * sizeof(RecordSizeType)
-    _data_offset = 41 + 2 * sizeof(RecordSizeType)
-    datatype = read_be(buffer, offset + _datatype_offset, Int32)
-    NumElems = read_be(buffer, offset + _numelems_offset, Int32)
+    datatype, NumElems, pos = aedr_value(buffer, offset, RecordSizeType)
     return if datatype in (CDF_CHAR, CDF_UCHAR)
-        load_char_data(buffer, offset + _data_offset, NumElems)
+        load_char_data(buffer, pos, NumElems)
     else
-        load_attribute_data(julia_type(datatype), buffer, offset + _data_offset, NumElems, needs_byte_swap)
+        load_attribute_data(julia_type(datatype), buffer, pos, NumElems, needs_byte_swap)
     end
 end
 

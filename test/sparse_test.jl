@@ -19,3 +19,21 @@
     @test m[:, [1, 4, 11]] == [0 -99 10; 1 -99 11]
     @test ds["pad2d"][2:2, 5:7] == [-99 -99 7]
 end
+
+# data/sparse_records.cdf from SciQLop/CDFpp, written by NASA's CDF library 3.9.2
+# (tests/resources/make_sparse_records.c). Expected values are what CDFgetzVarRecordData returned.
+@testset "Missing records match NASA's library" begin
+    ds = CDFDataset(data_path("sparse_records.cdf"))
+    fill = -1.0f31
+    @test ds["pad_explicit"][:] == Float32[10, 1.5, 1.5, 30, 1.5, 50]
+    @test ds["pad_with_fillval"][:] == Float32[10, fill, fill, 30, fill, 50]
+    @test ds["prev"][:] == Int32[7, 7, 22, 22, 44]
+    @test ds["prev_with_fillval"][:] == Int32[-99, -99, 22, 22, 44]
+    @test ds["default_double"][:] == [1, -1.0e30, 3]
+    @test ds["default_uint2"][:] == UInt16[1, 65534, 3]
+    @test ds["default_char"][:] == ["abc", " ", "xyz"]
+    @test ds["default_tt2000"][2].instant.value == typemin(Int64) + 1
+    @test ds["default_epoch"][2].instant == 0
+    @test ds["compressed_pad"][:] == Float32[10, 2.5, 2.5, 30]
+    @test ds["no_sparse_gap"][:] == Float32[10, -1.0f30, -1.0f30, 30]
+end

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Records a file doesn't store read as the variable's `FILLVAL` when it has one, like NASA's library since 3.8, instead of the pad value.
+
 ## [0.6.2] - 2026-11-01
 
 ### Changed
