@@ -2,8 +2,7 @@
 #
 # Builds a small static executable that opens a CDF and reads its metadata, then runs it.
 # This guards the "open + inspect" path against regressions in static reachability: a
-# stray dynamic dispatch (e.g. a record-size type passed as a value instead of `::Type{T}`,
-# or `getproperty` dragging in the heterogeneous attribute machinery) fails the verifier.
+# stray dynamic dispatch fails the verifier.
 #
 # The generic `ds[name]` path stays out of scope: its element type is only known at runtime,
 # so it cannot be statically resolved.

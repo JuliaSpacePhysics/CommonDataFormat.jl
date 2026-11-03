@@ -1,8 +1,5 @@
-# CDF parsing utilities
 # Low-level binary reading and record parsing functions
 
-# Buffer-based reading functions for zero-copy access
-# https://github.com/JuliaLang/julia/issues/31305
 @inline function read_be(v::Vector{UInt8}, i, T)
     checkbounds(v, i:(i + sizeof(T) - 1))
     return GC.@preserve v begin
@@ -78,14 +75,10 @@ function name_equals(buf::Vector{UInt8}, offset::Int, name::String, ::Type{FST})
     return GC.@preserve buf name ccall(:memcmp, Cint, (Ptr{UInt8}, Ptr{UInt8}, Csize_t), pointer(buf, offset), pointer(name), n) == 0
 end
 
-is_cdf_v3(magic_bytes) = magic_bytes == 0xCDF30001
-
 function is_big_endian_encoding(encoding)
     # Big-endian encodings: network(1), SUN(2), NeXT(12), PPC(9), SGi(5), IBMRS(7), ARM_BIG(19)
     return encoding in (1, 2, 5, 7, 9, 12, 19)
 end
-
-const cdf_magic_bytes = (0xCDF30001, 0xCDF26002, 0x0000FFFF) # CDF format uses different magic numbers: CDF3.0, CDF2.x versions
 
 # Big-endian files: swap each `unit`-byte word in place (0 = raw bytes, no swap).
 _swap_unit(::Type{T}) where {T} = sizeof(T)

@@ -75,8 +75,8 @@ function CDFDataset(filename)
     try
         buffer = Mmap.mmap(io)
         magic_bytes = length(buffer) >= 4 ? read_be(buffer, 1, UInt32) : nothing
-        magic_bytes in cdf_magic_bytes || throw(ArgumentError("not a CDF file: $fname"))
-        return is_cdf_v3(magic_bytes) ? CDFDataset{Int64}(fname, buffer) :
+        magic_bytes in (0xCDF30001, 0xCDF26002, 0x0000FFFF) || throw(ArgumentError("not a CDF file: $fname"))
+        return magic_bytes == 0xCDF30001 ? CDFDataset{Int64}(fname, buffer) :
             CDFDataset{Int32}(fname, buffer)
     finally
         close(io)
