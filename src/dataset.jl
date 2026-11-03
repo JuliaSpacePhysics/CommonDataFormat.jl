@@ -46,6 +46,7 @@ struct CDFDataset{FST}
     cdr::CDR{FST}
     gdr::GDR{FST}
     buffer::Vector{UInt8}
+    owned::Bool
     compression::CompressionType
     id::Int
     record_index::RecordIndex
@@ -73,29 +74,39 @@ function CDFDataset(filename)
     # `open(f, name, mode) do` form: routes through varargs splatting (`_apply_iterate`) which `juliac --trim` can't resolve.
     io = open(fname, "r")
     try
-        buffer = Mmap.mmap(io)
-        magic_bytes = length(buffer) >= 4 ? read_be(buffer, 1, UInt32) : nothing
-        magic_bytes in (0xCDF30001, 0xCDF26002, 0x0000FFFF) || throw(ArgumentError("not a CDF file: $fname"))
-        return magic_bytes == 0xCDF30001 ? CDFDataset{Int64}(fname, buffer) :
-            CDFDataset{Int32}(fname, buffer)
+        return _open(fname, Mmap.mmap(io), true)
     finally
         close(io)
     end
 end
 
-function CDFDataset{FST}(fname, buffer) where {FST}
+CDFDataset(bytes::AbstractVector{UInt8}) = _open("<memory>", convert(Vector{UInt8}, bytes), false)
+
+function _open(fname, buffer::Vector{UInt8}, owned::Bool)
+    magic_bytes = length(buffer) >= 4 ? read_be(buffer, 1, UInt32) : nothing
+    magic_bytes in (0xCDF30001, 0xCDF26002, 0x0000FFFF) || throw(ArgumentError("not a CDF file: $fname"))
+    return magic_bytes == 0xCDF30001 ? CDFDataset{Int64}(fname, buffer, owned) :
+        CDFDataset{Int32}(fname, buffer, owned)
+end
+
+function CDFDataset{FST}(fname, buffer, owned) where {FST}
     compression = NoCompression
     if is_compressed(read_be(buffer, 5, UInt32))
-        mmapped = buffer
+        compressed = buffer
         buffer, compression = decompress_bytes(buffer, FST)
-        finalize(mmapped)
+        owned && finalize(compressed)
+        owned = true
     end
     cdr = CDR{FST}(buffer, 8)
     gdr = GDR{FST}(buffer, Int(cdr.gdr_offset))
-    return CDFDataset{FST}(fname, cdr, gdr, buffer, compression, Threads.atomic_add!(DATASET_IDS, 1), RecordIndex(), ReentrantLock())
+    return CDFDataset{FST}(fname, cdr, gdr, buffer, owned, compression, Threads.atomic_add!(DATASET_IDS, 1), RecordIndex(), ReentrantLock())
 end
 
-Base.close(cdf::CDFDataset) = (evict_dataset!(BLOCK_CACHE, dataset_id(cdf)); finalize(parent(cdf)); nothing)
+function Base.close(cdf::CDFDataset)
+    evict_dataset!(BLOCK_CACHE, dataset_id(cdf))
+    getfield(cdf, :owned) && finalize(parent(cdf))
+    return
+end
 
 is_big_endian_encoding(cdf::CDFDataset) = is_big_endian_encoding(cdf.cdr.encoding)
 

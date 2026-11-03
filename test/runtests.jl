@@ -58,7 +58,7 @@ function gzip_dataset(spans)
         append!(buffer, zeros(UInt8, 16), reinterpret(UInt8, [hton(Int64(length(gz)))]), gz)
     end
     template = CDFDataset(data_path("a_cdf.cdf"))
-    ds = CDFDataset{Int64}("", getfield(template, :cdr), getfield(template, :gdr), buffer, CDF.NoCompression, -1, CDF.RecordIndex(), ReentrantLock())
+    ds = CDFDataset{Int64}("", getfield(template, :cdr), getfield(template, :gdr), buffer, true, CDF.NoCompression, -1, CDF.RecordIndex(), ReentrantLock())
     return ds, entries
 end
 
@@ -104,7 +104,7 @@ end
         @test length(ds) == length(keys(ds))
         @test [v.name for v in ds] == keys(ds)
     end
-    ds = CDFDataset(data_path("a_cdf.cdf"))
+    ds = CDFDataset(read(data_path("a_cdf.cdf")))
     @test haskey(ds, "var") && !haskey(ds, "nonexistent")
 end
 
@@ -116,6 +116,14 @@ end
     @test cds["var"][:] == v # compressed data lives in memory; close is a no-op
     @test isnothing(close(cds))
     @test cds["var"][:] == v
+    # the caller's bytes may be an mmap or carry finalizers of its own
+    for file in ("a_cdf.cdf", "a_compressed_cdf.cdf")
+        bytes = read(data_path(file))
+        finalized = Ref(false)
+        finalizer(_ -> (finalized[] = true), bytes)
+        close(CDFDataset(bytes))
+        @test !finalized[]
+    end
 end
 
 @testset "Uncompressed cdf file" begin
