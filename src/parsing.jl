@@ -76,8 +76,8 @@ function name_equals(buf::Vector{UInt8}, offset::Int, name::String, ::Type{FST})
 end
 
 function is_big_endian_encoding(encoding)
-    # Big-endian encodings: network(1), SUN(2), NeXT(12), PPC(9), SGi(5), IBMRS(7), ARM_BIG(19)
-    return encoding in (1, 2, 5, 7, 9, 12, 19)
+    # network(1), SUN(2), SGi(5), IBMRS(7), PPC(9), HP(11), NeXT(12), ARM_BIG(18)
+    return encoding in (1, 2, 5, 7, 9, 11, 12, 18)
 end
 
 # Big-endian files: swap each `unit`-byte word in place (0 = raw bytes, no swap).
