@@ -85,8 +85,13 @@ CDFDataset(bytes::AbstractVector{UInt8}) = _open("<memory>", convert(Vector{UInt
 function _open(fname, buffer::Vector{UInt8}, owned::Bool)
     magic_bytes = length(buffer) >= 4 ? read_be(buffer, 1, UInt32) : nothing
     magic_bytes in (0xCDF30001, 0xCDF26002, 0x0000FFFF) || throw(ArgumentError("not a CDF file: $fname"))
-    return magic_bytes == 0xCDF30001 ? CDFDataset{Int64}(fname, buffer, owned) :
-        CDFDataset{Int32}(fname, buffer, owned)
+    try
+        return magic_bytes == 0xCDF30001 ? CDFDataset{Int64}(fname, buffer, owned) :
+            CDFDataset{Int32}(fname, buffer, owned)
+    catch e
+        e isa BoundsError || rethrow()
+        throw(ArgumentError("truncated or corrupt CDF file: $fname"))
+    end
 end
 
 function CDFDataset{FST}(fname, buffer, owned) where {FST}
