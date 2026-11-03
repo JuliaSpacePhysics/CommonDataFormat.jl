@@ -382,6 +382,7 @@ function collect_vxr_entries!(entries::Vector{VVREntry}, src, offset, ::Type{Fie
             if record_type == VXR_
                 collect_vxr_entries!(entries, src, leaf_offset, FieldSizeT)
             else
+                last >= first || throw(ArgumentError("VXR entry ends at record $last before its first record $first"))
                 push!(entries, VVREntry(Int(first) + 1, Int(last) + 1, leaf_offset, record_type == CVVR_))
             end
         end
