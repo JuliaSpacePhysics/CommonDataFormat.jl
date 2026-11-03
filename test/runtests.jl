@@ -98,6 +98,27 @@ end
     end
 end
 
+# Swapping on the way to `dest` must equal reading stored bytes and swapping afterwards.
+@testset "big-endian sink" begin
+    rdims = (40, 2)
+    for (esz, unit) in ((2, 2), (4, 4), (8, 8), (16, 8))
+        ds, entries = gzip_dataset([(r, r + 1, rand(UInt8, 2 * esz * prod(rdims))) for r in (1, 3, 7)])
+        value = rand(UInt8, esz)
+        # direct, one long run per record, short runs; whole entries, partial entries and a gap
+        for ranges in ((1:40, 1:2), (1:40, 2:2), (2:3, 1:2)), recs in ((1, 8), (2, 3)), prev in (false, true)
+            n = esz * prod(length, ranges) * (recs[2] - recs[1] + 1)
+            read_with(swap) = (dst = Vector{UInt8}(undef, n); GC.@preserve dst begin
+                sink = CDF.RecordSink(pointer(dst), esz, rdims, ranges, false, swap)
+                CDF._read_records!(sink, ds, entries, recs..., CDF.GzipCompression, CDF.VirtualRecords(prev, value))
+            end; dst)
+            expected = read_with(1)
+            GC.@preserve expected CDF._byte_swap!(pointer(expected), pointer(expected), n, unit)
+            @test read_with(unit) == expected
+        end
+        CDF.evict_dataset!(CDF.BLOCK_CACHE, -1)
+    end
+end
+
 @testset "iteration" begin
     for file in ("a_cdf.cdf", "ac_h0_mfi_20230102_v07.cdf") # z-only and r+z chains
         ds = CDFDataset(data_path(file))

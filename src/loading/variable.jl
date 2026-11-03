@@ -5,12 +5,31 @@ const SinkLevels = NTuple{MAX_LEVELS,Int}
 # Type-erased block moves: Element movers, chosen once per block by element size; `ByteMove` covers odd sizes (CHAR data)
 struct WordMove{U} end
 struct ByteMove end
+struct SwapMove{U} end  # big-endian elements of one word
+struct SwapPairMove end  # Epoch16: two Float64 words
 @inline (::WordMove{U})(d::Ptr{UInt8}, s::Ptr{UInt8}, ::Int) where {U} = unsafe_store!(Ptr{U}(d), unsafe_load(Ptr{U}(s)))
 @inline (::ByteMove)(d::Ptr{UInt8}, s::Ptr{UInt8}, esz::Int) = unsafe_copyto!(d, s, esz)
+@inline (::SwapMove{U})(d::Ptr{UInt8}, s::Ptr{UInt8}, ::Int) where {U} = unsafe_store!(Ptr{U}(d), ntoh(unsafe_load(Ptr{U}(s))))
+@inline function (::SwapPairMove)(d::Ptr{UInt8}, s::Ptr{UInt8}, ::Int)
+    unsafe_store!(Ptr{UInt64}(d), ntoh(unsafe_load(Ptr{UInt64}(s))))
+    unsafe_store!(Ptr{UInt64}(d + 8), ntoh(unsafe_load(Ptr{UInt64}(s + 8))))
+    return
+end
+
+@inline _move_run!(_, d::Ptr{UInt8}, s::Ptr{UInt8}, nbytes::Int) = unsafe_copyto!(d, s, nbytes)
+@inline _move_run!(::SwapMove{U}, d::Ptr{UInt8}, s::Ptr{UInt8}, nbytes::Int) where {U} = _byte_swap!(d, s, nbytes, sizeof(U))
+@inline _move_run!(::SwapPairMove, d::Ptr{UInt8}, s::Ptr{UInt8}, nbytes::Int) = _byte_swap!(d, s, nbytes, 8)
 
 # Gather a column-major block of `dims` elements (`esz` bytes each) whose source byte
 # strides are `sstrides` into contiguous `dst`. Levels past the used ones are `1` with stride `0`.
-function _copy_block!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, dims::SinkLevels, sstrides::SinkLevels)
+function _copy_block!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, dims::SinkLevels, sstrides::SinkLevels, swap::Int)
+    if swap > 1
+        esz == 8 && return _copy_block!(dst, src, esz, dims, sstrides, SwapMove{UInt64}())
+        esz == 4 && return _copy_block!(dst, src, esz, dims, sstrides, SwapMove{UInt32}())
+        esz == 2 && return _copy_block!(dst, src, esz, dims, sstrides, SwapMove{UInt16}())
+        esz == 16 && return _copy_block!(dst, src, esz, dims, sstrides, SwapPairMove())
+        throw(ArgumentError("unsupported big-endian element size $esz"))
+    end
     esz == 8 && return _copy_block!(dst, src, esz, dims, sstrides, WordMove{UInt64}())
     esz == 4 && return _copy_block!(dst, src, esz, dims, sstrides, WordMove{UInt32}())
     esz == 2 && return _copy_block!(dst, src, esz, dims, sstrides, WordMove{UInt16}())
@@ -21,11 +40,11 @@ end
 
 @inline function _copy_runs!(dst::Ptr{UInt8}, src::Ptr{UInt8}, esz::Int, n0::Int, s0::Int, n1::Int, s1::Int, move)
     run_bytes = n0 * esz
-    memcpy_run = s0 == esz && run_bytes > 64  # a memmove call per short run costs more than it saves
+    whole_run = s0 == esz && run_bytes > 64  # a call per short run costs more than it saves
     for r in 0:(n1-1)
         run = src + r * s1
-        if memcpy_run
-            unsafe_copyto!(dst, run, run_bytes)
+        if whole_run
+            _move_run!(move, dst, run, run_bytes)
         else
             for i in 0:(n0-1)
                 move(dst + i * esz, run + i * s0, esz)
@@ -79,16 +98,17 @@ struct RecordSink
     offset::Int  # bytes into a stored record of the first element taken
     record_bytes::Int  # stored
     out_bytes::Int  # per record in `dest`
+    swap::Int
 end
 
 _direct(s::RecordSink) = iszero(s.nlevels)
 
-function RecordSink(dest::Ptr{UInt8}, esz::Int, rdims::NTuple{K,Int}, ranges::NTuple{K,UnitRange{Int}}, row::Bool) where {K}
+function RecordSink(dest::Ptr{UInt8}, esz::Int, rdims::NTuple{K,Int}, ranges::NTuple{K,UnitRange{Int}}, row::Bool, swap::Int = 1) where {K}
     record_bytes = esz * prod(rdims; init = 1)
     out_bytes = esz * prod(length, ranges; init = 1)
     dims, sstrides = ntuple(_ -> 1, Val(MAX_LEVELS)), ntuple(_ -> 0, Val(MAX_LEVELS))
     if out_bytes == record_bytes && (!row || count(>(1), rdims) <= 1)
-        return RecordSink(dest, esz, 0, dims, sstrides, 0, record_bytes, out_bytes)
+        return RecordSink(dest, esz, 0, dims, sstrides, 0, record_bytes, out_bytes, swap)
     end
     offset, m = 0, 0
     for (r, st) in zip(ranges, _strides(esz, rdims, row))
@@ -100,16 +120,16 @@ function RecordSink(dest::Ptr{UInt8}, esz::Int, rdims::NTuple{K,Int}, ranges::NT
         end
     end
     sstrides = Base.setindex(sstrides, record_bytes, m + 1)
-    return RecordSink(dest, esz, m + 1, dims, sstrides, offset, record_bytes, out_bytes)
+    return RecordSink(dest, esz, m + 1, dims, sstrides, offset, record_bytes, out_bytes, swap)
 end
 
 # `nrec` stored records at `src` into `dest`, `rec` records in.
 function _store!(s::RecordSink, rec::Int, src::Ptr{UInt8}, nrec::Int)
     dst = s.dest + rec * s.out_bytes
     if _direct(s)
-        unsafe_copyto!(dst, src, nrec * s.record_bytes)
+        _byte_swap!(dst, src, nrec * s.record_bytes, s.swap)
     else
-        _copy_block!(dst, src + s.offset, s.esz, Base.setindex(s.dims, nrec, s.nlevels), s.sstrides)
+        _copy_block!(dst, src + s.offset, s.esz, Base.setindex(s.dims, nrec, s.nlevels), s.sstrides, s.swap)
     end
     return
 end
@@ -150,8 +170,8 @@ function _contiguous(a)
 end
 
 function _read_array!(var::CDFVariable{T}, dest::AbstractArray{T}, ranges) where {T}
-    GC.@preserve dest _read_region!(Ptr{UInt8}(_ptr(dest)), sizeof(T), var, ranges)
-    is_big_endian_encoding(var) && _byte_swap!(dest)
+    swap = is_big_endian_encoding(var) ? _swap_unit(T) : 1
+    GC.@preserve dest _read_region!(Ptr{UInt8}(_ptr(dest)), sizeof(T), var, ranges, swap)
     return dest
 end
 
@@ -192,9 +212,9 @@ function record_index(vdr, ds::CDFDataset)
     end
 end
 
-function _read_region!(dest, esz, var::CDFVariable, ranges)
+function _read_region!(dest, esz, var::CDFVariable, ranges, swap = 1)
     vdr, ds = var.vdr, var.parentdataset
-    sink = RecordSink(dest, esz, Base.front(var.dims), map(_int_range, Base.front(ranges)), majority(ds) == Row)
+    sink = RecordSink(dest, esz, Base.front(var.dims), map(_int_range, Base.front(ranges)), majority(ds) == Row, swap)
     return _read_region!(sink, _int_range(ranges[end]), vdr, ds, record_index(vdr, ds)...)
 end
 
@@ -217,7 +237,7 @@ end
 # as `missing_value`.
 struct VirtualRecords
     prev::Bool
-    value::Vector{UInt8}  # one element, in file encoding so the final byte swap covers it
+    value::Vector{UInt8}  # one element, in file encoding
 end
 
 const NO_VIRTUAL = VirtualRecords(false, UInt8[])
@@ -295,6 +315,7 @@ function _fill_virtual!(sink, ds, entries, prev_idx, skip, n, compression, virtu
         GC.@preserve value for k in 0:esz:(out - 1)
             unsafe_copyto!(first_rec + k, pointer(value), esz)
         end
+        _byte_swap!(first_rec, first_rec, out, sink.swap)
     end
     for j in 1:(n - 1)
         unsafe_copyto!(first_rec + j * out, first_rec, out)
@@ -337,10 +358,8 @@ function _decode_whole!(sink, scratch, ds::CDFDataset{RST}, jobs, compression) w
         else
             load_cvvr_group!(buffer, map(((e, _), o, n) -> (out + o, e.offset, n), jobs, offsets, sizes), RST)
         end
-        if !direct
-            for ((e, rec), o) in zip(jobs, offsets)
-                _store!(sink, rec, out + o, length(e))
-            end
+        for ((e, rec), o, n) in zip(jobs, offsets, sizes)
+            direct ? _byte_swap!(out + o, out + o, n, sink.swap) : _store!(sink, rec, out + o, length(e))
         end
     end
     return

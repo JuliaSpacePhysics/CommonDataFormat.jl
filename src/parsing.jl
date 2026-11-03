@@ -83,25 +83,26 @@ function is_big_endian_encoding(encoding)
     return encoding in (1, 2, 5, 7, 9, 11, 12, 18)
 end
 
-# Big-endian files: swap each `unit`-byte word in place (0 = raw bytes, no swap).
+# Big-endian files: words are `unit` bytes each; a `unit` of 1 means raw bytes, nothing to swap.
 _swap_unit(::Type{T}) where {T} = sizeof(T)
 _swap_unit(::Type{Epoch16}) = 8  # two Float64s
-function _byte_swap!(p::Ptr{UInt8}, nbytes::Int, unit::Int)
-    unit <= 1 && return
-    unit == 2 && return _swap_words!(Ptr{UInt16}(p), nbytes ÷ 2)
-    unit == 4 && return _swap_words!(Ptr{UInt32}(p), nbytes ÷ 4)
-    unit == 8 && return _swap_words!(Ptr{UInt64}(p), nbytes ÷ 8)
+
+function _byte_swap!(dst::Ptr{UInt8}, src::Ptr{UInt8}, nbytes::Int, unit::Int)
+    if unit <= 1
+        dst == src || unsafe_copyto!(dst, src, nbytes)
+        return
+    end
+    unit == 2 && return _swap_words!(Ptr{UInt16}(dst), Ptr{UInt16}(src), nbytes ÷ 2)
+    unit == 4 && return _swap_words!(Ptr{UInt32}(dst), Ptr{UInt32}(src), nbytes ÷ 4)
+    unit == 8 && return _swap_words!(Ptr{UInt64}(dst), Ptr{UInt64}(src), nbytes ÷ 8)
     throw(ArgumentError("unsupported byte-swap unit $unit"))
 end
-function _swap_words!(p::Ptr{U}, n::Int) where {U}
-    for i in 1:n
-        unsafe_store!(p, ntoh(unsafe_load(p, i)), i)
+function _swap_words!(dst::Ptr{U}, src::Ptr{U}, n::Int) where {U}
+    @simd ivdep for i in 1:n
+        unsafe_store!(dst, ntoh(unsafe_load(src, i)), i)
     end
     return
 end
 # `pointer` goes through `cconvert`, so when `T` is not inferred any new
 # `cconvert(::Type{Ptr{X}}, ::Vector)` method (e.g. LibGit2's) invalidates the caller.
 _ptr(a::AbstractArray{T}) where {T} = Base.unsafe_convert(Ptr{T}, a)
-
-_byte_swap!(data::AbstractArray{T}) where {T} =
-    GC.@preserve data _byte_swap!(Ptr{UInt8}(_ptr(data)), length(data) * sizeof(T), _swap_unit(T))
