@@ -38,6 +38,79 @@ function inflate_group(cases)
     return outs
 end
 
+# Canonical Huffman codewords (RFC 1951 3.2.2), bit-reversed for LSB-first output.
+function huffman_codes(lens)
+    codes = zeros(UInt64, length(lens))
+    code = UInt64(0)
+    for l in 1:15
+        for i in eachindex(lens)
+            lens[i] == l || continue
+            codes[i] = bitreverse(code) >> (64 - l)
+            code += 1
+        end
+        code <<= 1
+    end
+    return codes
+end
+
+# A gzip member of `nsyms` random symbols, from a hand-built block whose codes reach the limits
+# zlib rarely emits: 15-bit length codes with 5 extra bits, 15-bit offset codes with 13.
+function worst_case_gzip(nsyms)
+    litlen = zeros(Int, 285)
+    literals = [65, 66, 67, 68, 69, 70, 71, 72, 73, 75, 76]
+    for (l, sym) in zip(1:15, [65, 66, 67, 68, 69, 70, 71, 72, 73, 272, 75, 256, 268, 257, 76])
+        litlen[sym + 1] = l
+    end
+    litlen[284 + 1] = 15
+    offset = zeros(Int, 30)
+    offset[1:14] .= 1:14
+    offset[28 + 1] = offset[29 + 1] = 15
+    litcodes, offcodes = huffman_codes(litlen), huffman_codes(offset)
+
+    bytes = UInt8[0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff]
+    buf, nbuf = UInt64(0), 0
+    function put(v, n)
+        buf |= UInt64(v) << nbuf
+        nbuf += n
+        while nbuf >= 8
+            push!(bytes, buf % UInt8)
+            buf >>= 8
+            nbuf -= 8
+        end
+    end
+    put(1, 1); put(2, 2)  # final, dynamic
+    put(285 - 257, 5); put(30 - 1, 5); put(19 - 4, 4)
+    # Precode: code lengths 0-15 get 4-bit codewords, repeat symbols 16-18 are unused.
+    foreach(sym -> put(sym <= 15 ? 4 : 0, 3), (16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15))
+    foreach(l -> put(bitreverse(UInt64(l)) >> 60, 4), [litlen; offset])
+
+    out = UInt8[]
+    put_sym(sym) = put(litcodes[sym + 1], litlen[sym + 1])
+    for _ in 1:nsyms
+        if isempty(out) || rand() < 0.6
+            sym = rand(literals)
+            put_sym(sym)
+            push!(out, sym)
+            continue
+        end
+        lensym, lenbase, lenextra = rand(((257, 3, 0), (268, 17, 1), (272, 31, 2), (284, 227, 5)))
+        put_sym(lensym)
+        extra = rand(0:((1 << lenextra) - 1))
+        put(extra, lenextra)
+        offsym, offbase, offextra = length(out) >= 32768 && rand(Bool) ? rand(((28, 16385, 13), (29, 24577, 13))) : (0, 1, 0)
+        put(offcodes[offsym + 1], offset[offsym + 1])
+        offbits = rand(0:((1 << offextra) - 1))
+        put(offbits, offextra)
+        for _ in 1:(lenbase + extra)
+            push!(out, out[end - (offbase + offbits) + 1])
+        end
+    end
+    put_sym(256)
+    put(0, 7)  # flush to a byte boundary
+    crc = GC.@preserve out CommonDataFormat.Inflate.crc32(pointer(out), length(out))
+    return out, [bytes; reinterpret(UInt8, [htol(crc), htol(length(out) % UInt32)])]
+end
+
 @testset "Inflate" begin
     rng_floats = collect(reinterpret(UInt8, Float32.(cumsum(randn(50_000)))))
     text = Vector{UInt8}(repeat("the quick brown fox jumps over the lazy dog ", 3000))
@@ -52,6 +125,23 @@ end
     for n in 2:4, _ in 1:15
         group = rand(cases, n)
         @test inflate_group(group) == first.(group)
+    end
+
+    @testset "code limits: bit budget and output overrun" begin
+        cases = [worst_case_gzip(8000) for _ in 1:20]
+        canary = 512
+        for (d, gz) in cases
+            out = fill(0xa5, length(d) + canary)
+            GC.@preserve out gz gzip_decompress!(pointer(out), length(d), pointer(gz), length(gz))
+            @test view(out, 1:length(d)) == d
+            @test all(==(0xa5), view(out, (length(d) + 1):length(out)))
+
+            cut = rand(1:(length(d) - 1))
+            out = fill(0xa5, cut + canary)
+            @test_throws InflateError GC.@preserve out gz gzip_decompress!(pointer(out), cut, pointer(gz), length(gz))
+            @test all(==(0xa5), view(out, (cut + 1):length(out)))
+        end
+        @test inflate_group(cases[1:4]) == first.(cases[1:4])
     end
 
     @testset "optional header fields" begin
