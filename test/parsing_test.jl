@@ -59,4 +59,5 @@ end
     write(path, bytes[1:(length(bytes) * 4 ÷ 5)])
     ds = CDFDataset(path)
     @test_throws Exception foreach(k -> Array(ds[k]), keys(ds))
+    @test_throws ArgumentError CDFDataset(bytes[1:64])
 end
