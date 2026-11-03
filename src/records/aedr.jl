@@ -48,5 +48,5 @@ end
 
 function load_char_data(buffer::Vector{UInt8}, pos, NumElems)
     checkbounds(buffer, pos:(pos + NumElems - 1))
-    return GC.@preserve buffer unsafe_string(pointer(buffer, pos), NumElems)
+    return _utf8(GC.@preserve buffer unsafe_string(pointer(buffer, pos), NumElems))
 end

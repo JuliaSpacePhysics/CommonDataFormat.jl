@@ -46,6 +46,12 @@ end
     @test CommonDataFormat._fill_strings!(Vector{String}(undef, 2), bytes, 4) == ["ab", "c\0d"]
 end
 
+@testset "Latin-1 text becomes UTF-8" begin
+    for text in Vector{UInt8}.(("Tromsø", "Troms\xf8"))
+        @test CommonDataFormat.load_char_data(text, 1, length(text)) == "Tromsø"
+    end
+end
+
 # Offsets in a truncated file point past the end of the mmap; reading them must throw, not segfault.
 @testset "Truncated file" begin
     bytes = read(data_path("ac_h0_mfi_20230102_v07.cdf"))
