@@ -14,6 +14,8 @@ using CommonDataFormat
 
 # Load a CDF file
 cdf = CDFDataset("data.cdf")
+# or from bytes in memory
+cdf = CDFDataset(read("data.cdf"))
 
 # Access basic information
 println("CDF version: ", cdf.version)
