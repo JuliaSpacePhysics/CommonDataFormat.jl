@@ -58,6 +58,9 @@ end
 
 @inline write_be(v::Vector{UInt8}, i, ::RInt32) = i + _sizeof(RInt32)
 
+# CDF before 3.8 had no UTF-8, so text values may be Latin-1
+_utf8(s::String) = isvalid(s) ? s : String(map(Char, codeunits(s)))
+
 # Name fields are NUL-padded to a fixed width: 256 bytes in CDF v3, 64 in v2.
 _name_width(::Type{FST}) where {FST} = FST == Int64 ? 256 : 64
 
