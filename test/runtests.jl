@@ -143,6 +143,13 @@ end
     @test_throws BoundsError v[0]
     @test_throws DimensionMismatch read!(v, zeros(eltype(v), 2), 1:3, 1:1, 1:1)
 
+    # read! into wrappers: contiguous (decoded in place)
+    v = CDFDataset(data_path("ac_h2_sis_20101105_v06.cdf"))["flux_He"]
+    R = (1:8, 13:24)
+    for dest in (reshape(view(zeros(Float32, 100), 3:98), 8, 12), view(zeros(Float32, 9, 12), 2:9, :))
+        @test isequal(read!(v, dest, R...), v[R...])
+    end
+
     # partial reads against whole-record reads: both majorities and encodings, spanning entries,
     # odd element size, virtual records, compression
     for (file, name) in (
