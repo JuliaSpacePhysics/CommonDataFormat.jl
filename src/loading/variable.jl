@@ -123,11 +123,33 @@ end
 function Base.read!(var::CDFVariable{T,N}, dest::AbstractArray{T}, ranges::Vararg{AbstractUnitRange{<:Integer},N}) where {T,N}
     _check_region(var, dest, ranges)
     isempty(dest) && return dest
-    dest isa Array || return copyto!(dest, read!(var, Array{T}(undef, size(dest)), ranges...))
+    _isdense(dest) || return copyto!(dest, read!(var, Array{T}(undef, size(dest)), ranges...))
     return _read_array!(var, dest, ranges)
 end
 
-function _read_array!(var::CDFVariable{T}, dest::Array{T}, ranges) where {T}
+# Decoding writes through a pointer, so `dest` must be CPU memory laying out bits elements in
+# column-major order without gaps
+_isdense(::Array) = true
+_isdense(a::StridedArray{T}) where {T} = isbitstype(T) && _cpubacked(a) && _contiguous(a)
+_isdense(_) = false
+
+_cpubacked(::Array) = true
+@static if isdefined(Base, :Memory)
+    _cpubacked(::Memory) = true
+end
+_cpubacked(a::Union{SubArray, Base.ReshapedArray, Base.ReinterpretArray}) = _cpubacked(parent(a))
+_cpubacked(_) = false
+
+function _contiguous(a)
+    s = 1
+    for d in 1:ndims(a)
+        size(a, d) == 1 || stride(a, d) == s || return false
+        s *= size(a, d)
+    end
+    return true
+end
+
+function _read_array!(var::CDFVariable{T}, dest::AbstractArray{T}, ranges) where {T}
     GC.@preserve dest _read_region!(Ptr{UInt8}(_ptr(dest)), sizeof(T), var, ranges)
     is_big_endian_encoding(var) && _byte_swap!(dest)
     return dest
