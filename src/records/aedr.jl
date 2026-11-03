@@ -43,8 +43,8 @@ end
 function load_attribute_data(::Type{T}, buffer::Vector{UInt8}, pos, NumElems, needs_byte_swap) where {T}
     checkbounds(buffer, pos:(pos + NumElems * sizeof(T) - 1))
     data = Vector{T}(undef, NumElems)
-    GC.@preserve data buffer unsafe_copyto!(_ptr(data), Ptr{T}(pointer(buffer, pos)), NumElems)
-    needs_byte_swap && _byte_swap!(data)
+    unit = needs_byte_swap ? _swap_unit(T) : 1
+    GC.@preserve data buffer _byte_swap!(Ptr{UInt8}(_ptr(data)), pointer(buffer, pos), NumElems * sizeof(T), unit)
     return data
 end
 
