@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Home · CommonDataFormat.jl</title><meta name="title" content="Home · CommonDataFormat.jl"/><meta property="og:title" content="Home · CommonDataFormat.jl"/><meta property="twitter:title" content="Home · CommonDataFormat.jl"/><meta name="description" content="Documentation for CommonDataFormat.jl."/><meta property="og:description" content="Documentation for CommonDataFormat.jl."/><meta property="twitter:description" content="Documentation for CommonDataFormat.jl."/><meta property="og:url" content="https://juliaspacephysics.github.io/CommonDataFormat.jl/"/><meta property="twitter:url" content="https://juliaspacephysics.github.io/CommonDataFormat.jl/"/><link rel="canonical" href="https://juliaspacephysics.github.io/CommonDataFormat.jl/"/><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="search_index.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body>
+<!-- NAVBAR START -->
+<style>
+    html {
+        scroll-padding-top: calc(55px + 1rem);
+    }
+
+    /* Documenter css tweaks */
+    .docs-sidebar {
+        margin-top: 3.75rem;
+    }
+
+    #documenter {
+        margin-top: 3.75rem;
+    }
+
+    .docs-version-selector {
+        margin-bottom: 60px !important;
+    }
+
+    @media screen and (max-width: 1056px) {
+        .docs-version-selector {
+            margin-bottom: 60px !important;
+        }
+
+        .docs-sidebar {
+            margin-top: 0 !important;
+        }
+    }
+    /* Documenter css tweaks ends here */
+
+    :root {
+        --heading-color: white;
+        --item-color: rgb(165, 165, 165);
+        --primary-bg: #f8f9fa;  /* Light gray to match Quarto's default navbar */
+        --navbar-text: #212529;  /* Dark text color for better contrast */
+        --hover-color: #e9ecef;  /* Slightly darker gray for hover state */
+        --deprecated-bg: #ff4d4d;
+        --deprecated-text: white;
+    }
+
+    .ext-navigation {
+        position: fixed;
+        height: 3.75rem;
+        top: 0;
+        width: 100%;
+        background-color: var(--primary-bg);
+        color: var(--navbar-text);
+        z-index: 1000;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        padding: 0 1.0625rem;
+        transition: transform 0.3s;
+    }
+
+    .ext-navbar-logo {
+        margin-left: 0.625rem;
+    }
+
+    .ext-nav-links {
+        display: flex;
+        align-items: center;
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        flex-grow: 1;
+    }
+
+    .ext-nav-links li {
+        margin-left: 1rem !important;
+    }
+
+    .ext-nav-link {
+        color: var(--navbar-text) !important;
+        text-decoration: none;
+        font-size: 1.0625rem !important;
+        transition: color 0.2s ease;
+        cursor: pointer;
+    }
+
+    .ext-nav-link:hover,
+    .ext-navbar-item-single a:hover {
+        color: var(--hover-color) !important;
+        text-decoration: none !important;
+    }
+    
+    .ext-navigation a {
+        text-decoration: none !important;
+    }
+
+    .ext-navbar-item-single a {
+        color: var(--navbar-text) !important;
+    }
+
+    .ext-menu-toggle {
+        display: none;
+        font-size: 1.5rem;
+        color: white;
+        cursor: pointer;
+    }
+
+    .ext-dropdown {
+        display: none;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        grid-template-rows: auto auto auto;
+        padding: 1.875rem;
+        position: absolute;
+        width: 100%;
+        left: 0;
+        background-color: var(--primary-bg);
+        line-height: 1.875rem;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        transform: translateY(-0.625rem);
+    }
+
+    #library-handler::after {
+        content: "▼";
+        font-size: 0.6875rem;
+        margin-left: 0.3125rem;
+        transition: transform 0.3s ease-in-out;
+    }
+
+    #library-handler.open::after {
+        content: "▲";
+    }
+
+    .ext-dropdown.show {
+        display: grid;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .ext-dropdown ul {
+        height: auto;
+        width: 12.5rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .ext-dropdown ul li {
+        text-align: left;
+        display: flex;
+        align-items: center;
+    }
+
+    .navbar-sub-item {
+        list-style: none;
+    }
+
+    .ext-dropdown ul a li {
+        color: var(--item-color);
+        width: 15.625rem;
+        border-radius: 3px;
+        padding: 0.125rem 0.625rem;
+        transition: background-color 0.2s ease;
+        text-decoration: none !important;
+    }
+
+    .ext-dropdown ul a li:hover {
+        background-color: rgba(107, 107, 107, 0.5);
+    }
+
+    .ext-dropdown-item-heading {
+        /* color: var(--heading-color); */
+        text-align: center;
+    }
+
+    .deprecated-badge {
+        background-color: var(--deprecated-bg);
+        color: var(--deprecated-text);
+        font-size: 0.75rem;
+        padding: 0.125rem 0.375rem;
+        border-radius: 3px;
+        margin-left: 0.5rem;
+        line-height: 1;
+    }
+
+    /* Responsive styling */
+    @media (max-width: 966px) {
+        .ext-dropdown {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .ext-nav-links {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            background-color: var(--primary-bg);
+            position: absolute;
+            top: 3.75rem;
+            left: 0;
+            padding: 0.625rem 0;
+            height: auto;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgb(141, 141, 141) grey;
+        }
+
+        .ext-nav-links.show {
+            display: flex;
+        }
+
+        .ext-nav-links li {
+            margin: 0.625rem 0;
+            text-align: center;
+        }
+
+        .ext-menu-toggle {
+            display: block;
+            margin-left: auto;
+        }
+
+        .ext-navigation.hide {
+            transform: translateY(-3.75rem);
+        }
+
+        .ext-dropdown {
+            place-content: center;
+            text-align: center;
+            grid-template-columns: 1fr;
+            line-height: 1.25rem;
+            padding: 0.625rem;
+        }
+
+        .ext-dropdown ul {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 0.3125rem;
+        }
+
+        .ext-dropdown ul li {
+            text-align: center;
+            /* justify-content: center; */
+        }
+
+        .ext-dropdown ul a li {
+            width: 100%;
+        }
+
+        .ext-dropdown ul a li:hover {
+            background-color: var(--primary-bg);
+            /* color: #fff; */
+        }
+
+        /* Modified scroll bar */
+        .ext-nav-links::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .ext-nav-links::-webkit-scrollbar-track {
+            box-shadow: inset 0 0 5px grey;
+        }
+
+        .ext-nav-links::-webkit-scrollbar-thumb {
+            background: rgb(141, 141, 141);
+            border-radius: 3px;
+        }
+
+        .ext-nav-links::-webkit-scrollbar-thumb:hover {
+            background: #9b9b9b;
+        }
+    }
+</style>
+<nav class="ext-navigation">
+    <a href="https://juliaspacephysics.github.io"></a>
+    <a style="color: #212529 !important; font-size: 21.25px !important; margin-left: 10px;" href="https://juliaspacephysics.github.io">JuliaSpacePhysics</a>
+    <ul class="ext-nav-links">
+        <li>
+            <p class="ext-nav-link" id="library-handler">Ecosystem</p>
+            <div class="ext-dropdown" id="ext-dropdown-items">
+                <ul>
+                    <li class="ext-dropdown-item-heading">Core</li>
+                    <a href="https://juliaspacephysics.github.io/SPEDAS.jl"><li>SPEDAS.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/SpaceDataModel.jl"><li>SpaceDataModel.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/GeoCotrans.jl"><li>GeoCotrans.jl</li></a>
+                    <a href="https://henry2004y.github.io/TestParticle.jl/"><li>TestParticle.jl</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">Data</li>
+                    <a href="https://juliaspacephysics.github.io/CDFDatasets.jl/"><li>CDFDatasets.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/CDAWeb.jl/"><li>CDAWeb.jl</li></a>
+                    <a href="https://sciqlop.github.io/Speasy.jl/"><li>Speasy.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/HAPIClient.jl/"><li>HAPIClient.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/Madrigal.jl/"><li>Madrigal.jl</li></a>
+                    <a href="https://github.com/JuliaSpacePhysics/PySPEDAS.jl"><li>PySPEDAS.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/SunPy.jl/"><li>SunPy.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/CommonDataFormat.jl/"><li>CommonDataFormat.jl</li></a>
+                </ul>
+                <ul>
+                    <li class="ext-dropdown-item-heading">Domain</li>
+                    <a href="https://juliaspacephysics.github.io/SpaceWeather.jl"><li>SpaceWeather.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/SolarEnergeticParticle.jl"><li>SolarEnergeticParticle.jl (Helio)</li></a>
+                    <a href="https://juliaspacephysics.github.io/GeoAACGM.jl"><li>GeoAACGM.jl (ITM)</li></a>
+                    <a href="https://juliaspacephysics.github.io/IRBEM.jl"><li>IRBEM.jl (Magnetosphere)</li></a>
+                    <a href="https://juliaspacephysics.github.io/TsyganenkoModels.jl"><li>TsyganenkoModels.jl (Magnetosphere)</li></a>
+                </ul>
+                <!-- Enable when more mission-specific packages are available -->
+                <ul>
+                    <li class="ext-dropdown-item-heading">Mission-specific</li>
+                    <a href="https://juliaspacephysics.github.io/EISCATData.jl"><li>EISCATData.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/ELFINData.jl"><li>ELFINData.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/DMSPData.jl"><li>DMSPData.jl</li></a>
+                </ul>
+               
+                <ul>
+                    <li class="ext-dropdown-item-heading">General Analysis</li>
+                    <a href="https://juliaplasma.github.io/PlasmaFormulary.jl"><li>JuliaPlasma/PlasmaFormulary.jl</li></a>
+                    <a href="https://juliaplasma.github.io/ChargedParticles.jl"><li>JuliaPlasma/ChargedParticles.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/VelocityDistributionFunctions.jl"><li>VelocityDistributionFunctions.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/PlasmaWaves.jl"><li>PlasmaWaves.jl</li></a>
+                    <a href="https://juliaspacephysics.github.io/PlasmaBO.jl"><li>PlasmaBO.jl</li></a>
+                    <a href="https://github.com/JuliaSpacePhysics/SpacePhysicsMakie.jl"><li>SpacePhysicsMakie.jl</li></a>
+                </ul>
+            </div>
+        </li>
+        <li><a href="https://juliaspacephysics.github.io/tutorials/">Tutorials</a></li>
+    </ul>
+    <a href="https://github.com/JuliaSpacePhysics">
+        <svg width="32px" height="32px" viewBox="-8.2 -8.2 36.40 36.40" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="#000000">
+            <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+            <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+            <g id="SVGRepo_iconCarrier">
+                <title>github [#142]</title>
+                <desc>JuliaSpacePhysics</desc>
+                <defs></defs>
+                <g id="Page-1" stroke-width="0.0002" fill="none" fill-rule="evenodd">
+                    <g id="Dribbble-Light-Preview" transform="translate(-140.000000, -7559.000000)" fill="#ffffff">
+                        <g id="icons" transform="translate(56.000000, 160.000000)">
+                            <path
+                                d="M94,7399 C99.523,7399 104,7403.59 104,7409.253 C104,7413.782 101.138,7417.624 97.167,7418.981 C96.66,7419.082 96.48,7418.762 96.48,7418.489 C96.48,7418.151 96.492,7417.047 96.492,7415.675 C96.492,7414.719 96.172,7414.095 95.813,7413.777 C98.04,7413.523 100.38,7412.656 100.38,7408.718 C100.38,7407.598 99.992,7406.684 99.35,7405.966 C99.454,7405.707 99.797,7404.664 99.252,7403.252 C99.252,7403.252 98.414,7402.977 96.505,7404.303 C95.706,7404.076 94.85,7403.962 94,7403.958 C93.15,7403.962 92.295,7404.076 91.497,7404.303 C89.586,7402.977 88.746,7403.252 88.746,7403.252 C88.203,7404.664 88.546,7405.707 88.649,7405.966 C88.01,7406.684 87.619,7407.598 87.619,7408.718 C87.619,7412.646 89.954,7413.526 92.175,7413.785 C91.889,7414.041 91.63,7414.493 91.54,7415.156 C90.97,7415.418 89.522,7415.871 88.63,7414.304 C88.63,7414.304 88.101,7413.319 87.097,7413.247 C87.097,7413.247 86.122,7413.234 87.029,7413.87 C87.029,7413.87 87.684,7414.185 88.139,7415.37 C88.139,7415.37 88.726,7417.2 91.508,7416.58 C91.513,7417.437 91.522,7418.245 91.522,7418.489 C91.522,7418.76 91.338,7419.077 90.839,7418.982 C86.865,7417.627 84,7413.783 84,7409.253 C84,7403.59 88.478,7399 94,7399"
+                                id="github-[#142]">
+                            </path>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </svg>
+    </a>
+    <span class="ext-menu-toggle">&#9776;</span>
+</nav>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const menuToggle = document.querySelector(".ext-menu-toggle");
+        const navLinks = document.querySelector(".ext-nav-links");
+        const nav = document.querySelector(".ext-navigation");
+        const navigationHandler = document.getElementById("library-handler");
+        const navigationItemsContainer =
+            document.getElementById("ext-dropdown-items");
+        let lastScrollY = window.scrollY;
+
+        function setAppropriateHeight() {
+            if (window.innerWidth <= 768) {
+                const viewportHeight = window.innerHeight;
+                const navHeight = nav.offsetHeight;
+                navLinks.style.maxHeight = `${viewportHeight - navHeight}px`;
+                navLinks.style.overflowY = "auto";
+            } else {
+                navLinks.style.maxHeight = "";
+                navLinks.style.overflowY = "";
+            }
+        }
+
+        // Toggle main menu for mobile
+        menuToggle.addEventListener("click", () => {
+            navLinks.classList.toggle("show");
+            if (navLinks.classList.contains("show")) {
+                setAppropriateHeight();
+                // Ensure the dropdown is hidden when menu is first opened
+                navigationItemsContainer.style.display = "none";
+                navigationItemsContainer.classList.remove("show");
+            }
+        });
+
+        // Close menus if clicked outside
+        document.addEventListener("click", (event) => {
+            if (
+                !navLinks.contains(event.target) &&
+                !menuToggle.contains(event.target)
+            ) {
+                navLinks.classList.remove("show");
+                navigationItemsContainer.classList.remove("show");
+                navigationHandler.classList.remove("open");
+            }
+        });
+
+        // Hide navigation bar on scroll down in mobile view
+        window.addEventListener("scroll", () => {
+            if (window.innerWidth <= 768) {
+                nav.classList.toggle("hide", window.scrollY > lastScrollY);
+                lastScrollY = window.scrollY;
+            }
+        });
+
+        // Library API script
+        navigationHandler.addEventListener("click", (event) => {
+            event.preventDefault(); // Prevent default action of the link
+            if (navigationItemsContainer.classList.contains("show")) {
+                navigationItemsContainer.classList.remove("show");
+                navigationHandler.classList.remove("open");
+                setTimeout(() => {
+                    navigationItemsContainer.style.display = "none";
+                }, 500); // Match the timeout to the CSS transition duration
+            } else {
+                navigationItemsContainer.style.display = "grid";
+                navigationHandler.classList.add("open");
+                setTimeout(() => {
+                    navigationItemsContainer.classList.add("show");
+                }, 10); // Delay to ensure the display change takes effect before adding class
+            }
+            setAppropriateHeight(); // Recalculate height when dropdown changes
+        });
+
+        // Handle window resize
+        window.addEventListener("resize", setAppropriateHeight);
+
+        // Initial setup
+        setAppropriateHeight();
+    });
+</script>
+<!-- NAVBAR END -->
+
+<div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href>CommonDataFormat.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li class="is-active"><a class="tocitem" href>Home</a><ul class="internal"><li><a class="tocitem" href="#API-Reference"><span>API Reference</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Home</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Home</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/main/docs/src/index.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="CommonDataFormat.jl"><a class="docs-heading-anchor" href="#CommonDataFormat.jl">CommonDataFormat.jl</a><a id="CommonDataFormat.jl-1"></a><a class="docs-heading-anchor-permalink" href="#CommonDataFormat.jl" title="Permalink"></a></h1><p>A Julia package for reading Common Data Format (CDF) files.</p><h2 id="API-Reference"><a class="docs-heading-anchor" href="#API-Reference">API Reference</a><a id="API-Reference-1"></a><a class="docs-heading-anchor-permalink" href="#API-Reference" title="Permalink"></a></h2><ul><li><a href="#CommonDataFormat.ADR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.ADR</code></a></li><li><a href="#CommonDataFormat.ADR-Tuple{IO, Any}"><code>CommonDataFormat.ADR</code></a></li><li><a href="#CommonDataFormat.ADR"><code>CommonDataFormat.ADR</code></a></li><li><a href="#CommonDataFormat.AEDR"><code>CommonDataFormat.AEDR</code></a></li><li><a href="#CommonDataFormat.CDFDataset-Tuple{Any}"><code>CommonDataFormat.CDFDataset</code></a></li><li><a href="#CommonDataFormat.CDR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.CDR</code></a></li><li><a href="#CommonDataFormat.CDR"><code>CommonDataFormat.CDR</code></a></li><li><a href="#CommonDataFormat.Epoch"><code>CommonDataFormat.Epoch</code></a></li><li><a href="#CommonDataFormat.Epoch16"><code>CommonDataFormat.Epoch16</code></a></li><li><a href="#CommonDataFormat.GDR"><code>CommonDataFormat.GDR</code></a></li><li><a href="#CommonDataFormat.GDR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.GDR</code></a></li><li><a href="#CommonDataFormat.Header"><code>CommonDataFormat.Header</code></a></li><li><a href="#CommonDataFormat.TT2000"><code>CommonDataFormat.TT2000</code></a></li><li><a href="#CommonDataFormat.VDR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.VDR</code></a></li><li><a href="#CommonDataFormat.VDR"><code>CommonDataFormat.VDR</code></a></li><li><a href="#CommonDataFormat.VVR"><code>CommonDataFormat.VVR</code></a></li><li><a href="#CommonDataFormat.VXR"><code>CommonDataFormat.VXR</code></a></li><li><a href="#CommonDataFormat.VXR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.VXR</code></a></li><li><a href="#CommonDataFormat.zVDR"><code>CommonDataFormat.zVDR</code></a></li><li><a href="#CommonDataFormat.attrib-Tuple{CDFDataset}"><code>CommonDataFormat.attrib</code></a></li><li><a href="#CommonDataFormat.attrib-Tuple{CDFDataset, String}"><code>CommonDataFormat.attrib</code></a></li><li><a href="#CommonDataFormat.attribnames-Tuple{CDFDataset}"><code>CommonDataFormat.attribnames</code></a></li><li><a href="#CommonDataFormat.decode_cdr_flags-Tuple{Any}"><code>CommonDataFormat.decode_cdr_flags</code></a></li><li><a href="#CommonDataFormat.is_big_endian_encoding-Tuple{Any}"><code>CommonDataFormat.is_big_endian_encoding</code></a></li><li><a href="#CommonDataFormat.is_cdf_v3-Tuple{Any}"><code>CommonDataFormat.is_cdf_v3</code></a></li><li><a href="#CommonDataFormat.load_attribute_entries-Tuple{Vector{UInt8}, Any, Any, Any}"><code>CommonDataFormat.load_attribute_entries</code></a></li><li><a href="#CommonDataFormat.read_uint32_be-Tuple{IO}"><code>CommonDataFormat.read_uint32_be</code></a></li><li><a href="#CommonDataFormat.vattrib-Tuple{Any, Any, Any}"><code>CommonDataFormat.vattrib</code></a></li><li><a href="#CommonDataFormat.vattrib-Tuple{CDFDataset, Integer}"><code>CommonDataFormat.vattrib</code></a></li><li><a href="#CommonDataFormat.@read_be_fields-Tuple{Any, Any, Vararg{Any}}"><code>CommonDataFormat.@read_be_fields</code></a></li></ul><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.ADR" href="#CommonDataFormat.ADR"><code>CommonDataFormat.ADR</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><p>Attribute Descriptor Record (ADR)</p><p>Contains a description of an attribute in a CDF. There will be one ADR per attribute. The ADRhead field of the ADR contains the file offset of the first ADR.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/adr.jl#L1-L5">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.ADR-Tuple{IO, Any}" href="#CommonDataFormat.ADR-Tuple{IO, Any}"><code>CommonDataFormat.ADR</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">ADR(io::IO, RecordSizeType)</code></pre><p>Load an Attribute Descriptor Record from the IO stream at the specified offset.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/adr.jl#L25-L29">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.ADR-Tuple{Vector{UInt8}, Any, Any}" href="#CommonDataFormat.ADR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.ADR</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">ADR(buf, pos, RecordSizeType)</code></pre><p>Load an Attribute Descriptor Record from the buffer at the specified position.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/adr.jl#L46-L50">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.AEDR" href="#CommonDataFormat.AEDR"><code>CommonDataFormat.AEDR</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">AEDR</code></pre><p>Attribute g/r Entry Descriptor Record. Describes a global entry (for global attributes) or rVariable entry (for variable attributes).</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/aedr.jl#L3-L8">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.CDFDataset-Tuple{Any}" href="#CommonDataFormat.CDFDataset-Tuple{Any}"><code>CommonDataFormat.CDFDataset</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">CDFDataset(filename)</code></pre><p>Load a CDF file and return a CDFDataset object.</p><p><strong>Example</strong></p><pre><code class="language-julia hljs">cdf = CDFDataset(&quot;data.cdf&quot;)</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/dataset.jl#L13-L22">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.CDR" href="#CommonDataFormat.CDR"><code>CommonDataFormat.CDR</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><p>CDF Descriptor Record (CDR) - the main file header record Contains version, encoding, format information, and pointer to GDR</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/cdr.jl#L1-L4">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.CDR-Tuple{Vector{UInt8}, Any, Any}" href="#CommonDataFormat.CDR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.CDR</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">CDR(buffer, pos, FieldSizeT)</code></pre><p>Load a CDF Descriptor Record from the IO stream at the specified offset. This follows the CDF specification for CDR record structure.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/cdr.jl#L24-L29">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.Epoch" href="#CommonDataFormat.Epoch"><code>CommonDataFormat.Epoch</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">Epoch</code></pre><p>Milliseconds since Year 0 (01-Jan-0000 00:00:00.000) Represented as a single double.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/epochs.jl#L17-L22">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.Epoch16" href="#CommonDataFormat.Epoch16"><code>CommonDataFormat.Epoch16</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">Epoch16</code></pre><p>Picoseconds since Year 0 (01-Jan-0000 00:00:00.000.000.000.000) Represented as two doubles (seconds and picoseconds).</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/epochs.jl#L27-L32">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.GDR" href="#CommonDataFormat.GDR"><code>CommonDataFormat.GDR</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><p>Global Descriptor Record (GDR) - contains global information about the CDF file Points to variable and attribute descriptor records</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/gdr.jl#L1-L4">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.GDR-Tuple{Vector{UInt8}, Any, Any}" href="#CommonDataFormat.GDR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.GDR</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">GDR(buffer::Vector{UInt8}, pos, FieldSizeT)</code></pre><p>Load a Global Descriptor Record from the buffer at the specified offset.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/gdr.jl#L24-L28">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.Header" href="#CommonDataFormat.Header"><code>CommonDataFormat.Header</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><p>CDF Record header structure - common to all record types</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/records.jl#L8-L10">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.TT2000" href="#CommonDataFormat.TT2000"><code>CommonDataFormat.TT2000</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">TT2000</code></pre><p>Nanoseconds since J2000 (01-Jan-2000 12:00:00.000.000.000) with leap seconds, represented as an 8-byte integer.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/epochs.jl#L38-L43">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.VDR" href="#CommonDataFormat.VDR"><code>CommonDataFormat.VDR</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><p>Variable Descriptor Record (VDR) - describes a single variable Can be either r-variable (record variant) or z-variable (zero variant)</p><p>See also: <a href="#CommonDataFormat.zVDR">zVDR</a></p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/vdr.jl#L3-L8">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.VDR-Tuple{Vector{UInt8}, Any, Any}" href="#CommonDataFormat.VDR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.VDR</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">VDR(io::IO, RecordSizeType) -&gt; VDR</code></pre><p>Load a Variable Descriptor Record from the IO stream at the specified offset.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/vdr.jl#L53-L57">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.VVR" href="#CommonDataFormat.VVR"><code>CommonDataFormat.VVR</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><p>Variable Value Record (VVR) - contains actual variable data</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/vvr.jl#L4-L6">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.VXR" href="#CommonDataFormat.VXR"><code>CommonDataFormat.VXR</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><p>Variable Index Record (VXR) - contains pointers to variable data records</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/vxr.jl#L1-L3">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.VXR-Tuple{Vector{UInt8}, Any, Any}" href="#CommonDataFormat.VXR-Tuple{Vector{UInt8}, Any, Any}"><code>CommonDataFormat.VXR</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">VXR(source, offset, RecordSizeType)</code></pre><p>Load a Variable Index Record from the source at the specified offset.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/vxr.jl#L16-L20">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.zVDR" href="#CommonDataFormat.zVDR"><code>CommonDataFormat.zVDR</code></a> — <span class="docstring-category">Type</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><p>z-Variable Descriptor Record (zVDR)</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/vdr.jl#L28-L30">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.attrib-Tuple{CDFDataset, String}" href="#CommonDataFormat.attrib-Tuple{CDFDataset, String}"><code>CommonDataFormat.attrib</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">attrib(cdf::CDFDataset, attribute_name::String)</code></pre><p>Retrieve all entries for a named attribute from the CDF file.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/loading/attribute.jl#L36-L40">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.attrib-Tuple{CDFDataset}" href="#CommonDataFormat.attrib-Tuple{CDFDataset}"><code>CommonDataFormat.attrib</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">attrib(cdf::CDFDataset)</code></pre><p>Load all attributes from the CDF file.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/loading/attribute.jl#L17-L21">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.attribnames-Tuple{CDFDataset}" href="#CommonDataFormat.attribnames-Tuple{CDFDataset}"><code>CommonDataFormat.attribnames</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">attribnames(cdf::CDFDataset)</code></pre><p>Return a list of attribute names in the CDF file.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/loading/attribute.jl#L116-L120">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.decode_cdr_flags-Tuple{Any}" href="#CommonDataFormat.decode_cdr_flags-Tuple{Any}"><code>CommonDataFormat.decode_cdr_flags</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">decode_cdr_flags(flags::UInt32)</code></pre><p>Decode the CDR flags field into individual boolean flags.</p><p><strong>CDF Flags (from CDF specification):</strong></p><ul><li>Bit 0: Majority (1=row-major, 0=column-major)</li><li>Bit 1: File format (1=single-file, 0=multi-file)</li><li>Bit 2: Checksum used (1=checksum present, 0=no checksum)</li><li>Bit 3: MD5 checksum method (requires bit 2=1)</li></ul></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/records/records.jl#L58-L68">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.is_big_endian_encoding-Tuple{Any}" href="#CommonDataFormat.is_big_endian_encoding-Tuple{Any}"><code>CommonDataFormat.is_big_endian_encoding</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">is_big_endian_encoding(encoding)</code></pre><p>Determine if a CDF encoding uses big-endian byte order based on CDF specification encoding values.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/parsing.jl#L131-L135">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.is_cdf_v3-Tuple{Any}" href="#CommonDataFormat.is_cdf_v3-Tuple{Any}"><code>CommonDataFormat.is_cdf_v3</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">is_cdf_v3(magic_bytes)</code></pre><p>Determine if this is a CDF v3 file based on the magic number.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/parsing.jl#L124-L128">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.load_attribute_entries-Tuple{Vector{UInt8}, Any, Any, Any}" href="#CommonDataFormat.load_attribute_entries-Tuple{Vector{UInt8}, Any, Any, Any}"><code>CommonDataFormat.load_attribute_entries</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">load_attribute_entries(buffer::Vector{UInt8}, adr, RecordSizeType, cdf_encoding) -&gt; Vector{AttributeEntry}</code></pre><p>Load all attribute entries for a given attribute from its AEDRs.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/loading/attribute.jl#L4-L8">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.read_uint32_be-Tuple{IO}" href="#CommonDataFormat.read_uint32_be-Tuple{IO}"><code>CommonDataFormat.read_uint32_be</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">read_uint32_be(io::IO)</code></pre><p>Read a 32-bit unsigned integer in big-endian byte order. CDF format uses big-endian for record fields.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/parsing.jl#L116-L121">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.vattrib-Tuple{Any, Any, Any}" href="#CommonDataFormat.vattrib-Tuple{Any, Any, Any}"><code>CommonDataFormat.vattrib</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">vattrib(cdf, varnum, name)</code></pre><p>Optimized version that loads only the requested attribute for the given variable number. Much faster than loading all attributes when only one is needed.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/loading/attribute.jl#L77-L82">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.vattrib-Tuple{CDFDataset, Integer}" href="#CommonDataFormat.vattrib-Tuple{CDFDataset, Integer}"><code>CommonDataFormat.vattrib</code></a> — <span class="docstring-category">Method</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">vattrib(cdf::CDFDataset, varnum::Integer)</code></pre><p>Get all variable attributes for a specific variable number.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/loading/attribute.jl#L53-L57">source</a></section></article><article class="docstring"><header><a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring"></a><a class="docstring-binding" id="CommonDataFormat.@read_be_fields-Tuple{Any, Any, Vararg{Any}}" href="#CommonDataFormat.@read_be_fields-Tuple{Any, Any, Vararg{Any}}"><code>CommonDataFormat.@read_be_fields</code></a> — <span class="docstring-category">Macro</span><span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring"></span></header><section><div><pre><code class="language-julia hljs">@read_be_fields buffer pos T1 T2 ...</code></pre><p>Unrolls sequential big-endian reads starting at <code>pos</code> within <code>buffer</code>. Returns a tuple of the parsed values and the updated position, mirroring <code>read_be_i</code> but without the runtime <code>ntuple</code>/offset bookkeeping.</p><p><strong>Example</strong></p><pre><code class="language-julia hljs">values, next = @read_be_fields buf pos UInt32 Int16</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSpacePhysics/CommonDataFormat.jl/blob/0e4b1463139eeacf55a9d2983f3b5b6d6e86d844/src/parsing.jl#L37-L49">source</a></section></article></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Wednesday 24 September 2025 21:06">Wednesday 24 September 2025</span>. Using Julia version 1.11.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
