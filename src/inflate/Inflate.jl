@@ -245,7 +245,8 @@ function fixed_tables()
 end
 const FIXED_LIT, FIXED_OFF = fixed_tables()
 
-@inline tload(t::Ptr{UInt32}, i::UInt64) = unsafe_load(t + (i << 2))
+# indexing lets it be a plain mask + scaled load
+@inline tload(t::Ptr{UInt32}, i::UInt64) = unsafe_load(t, i % Int + 1)
 @inline lowbits(x::UInt64, n::UInt64) = x & ((UInt64(1) << (n & 63)) - 1)
 
 # Hot-loop registers, kept out of the mutable `Stream` so they live in registers.
@@ -287,10 +288,11 @@ end
 
 @inline refill(r::Regs, s::Stream) = s.in_end - r.inp >= 8 ? refill_fast(r) : refill_slow(r, s)
 
-# Per iteration the fast loop refills twice (≤ 7 bytes each, 8-byte loads) and writes
-# ≤ 3 literals + a 258-byte match with ≤ 15 bytes of word-copy overrun.
+# Per iteration the fast loop refills at most twice (≤ 7 bytes each, 8-byte loads) and writes
+# ≤ 3 literals + a 258-byte match with word-copy overrun.
 const IN_MARGIN = 16
-const OUT_MARGIN = 3 + 258 + 16
+const COPY_OVERRUN = 32
+const OUT_MARGIN = 3 + 258 + COPY_OVERRUN
 
 @inline fast_ok(r::Regs, s::Stream) = s.in_end - r.inp >= IN_MARGIN && s.out_end - r.out >= OUT_MARGIN
 
@@ -302,15 +304,17 @@ const OK, EOB, BAD = 0, 1, 2
     return Regs(r.bitbuf, r.bitsleft, r.inp, r.out + 1)
 end
 
-# Copy a `len`-byte match from `dist` back; may write up to 15 bytes past the end.
+# Copy a `len`-byte match from `dist` back; may write up to `COPY_OVERRUN` bytes past the end.
+# The unconditional words cover most matches, sparing them the hard-to-predict loop exit.
 @inline function copy_match(out::Ptr{UInt8}, dist::UInt64, len::UInt64)
     src = out - dist
     stop = out + len
     if dist >= 8
-        unsafe_store!(Ptr{UInt64}(out), unsafe_load(Ptr{UInt64}(src)))
-        unsafe_store!(Ptr{UInt64}(out + 8), unsafe_load(Ptr{UInt64}(src + 8)))
-        out += 16
-        src += 16
+        for i in 0:8:(COPY_OVERRUN - 8)
+            unsafe_store!(Ptr{UInt64}(out + i), unsafe_load(Ptr{UInt64}(src + i)))
+        end
+        out += COPY_OVERRUN
+        src += COPY_OVERRUN
         while out < stop
             unsafe_store!(Ptr{UInt64}(out), unsafe_load(Ptr{UInt64}(src)))
             out += 8
@@ -318,9 +322,10 @@ end
         end
     elseif dist == 1
         v = UInt64(unsafe_load(src)) * 0x0101010101010101
-        unsafe_store!(Ptr{UInt64}(out), v)
-        unsafe_store!(Ptr{UInt64}(out + 8), v)
-        out += 16
+        for i in 0:8:(COPY_OVERRUN - 8)
+            unsafe_store!(Ptr{UInt64}(out + i), v)
+        end
+        out += COPY_OVERRUN
         while out < stop
             unsafe_store!(Ptr{UInt64}(out), v)
             out += 8
@@ -347,16 +352,18 @@ end
 
 # Consume length/offset entry `e`; its value is the base plus the extra bits above the codeword.
 @inline function take_value(r::Regs, e::UInt32)
-    extra = lowbits(r.bitbuf, UInt64(e & 0x1f)) >> ((e >> 8) & 0xf)
+    extra = lowbits(r.bitbuf, UInt64(e)) >> ((e >> 8) & 0xf)
     return consume(r, e), UInt64(e >> 16) + extra
 end
 
-# One fast-loop step: ≤ 3 literals or one match. Entries are looked up before the refill
-# they follow, taking it off the dependency chain: a fast refill leaves 64 real bits in
-# `bitbuf` (those above `bitsleft` are the next input bytes) and a step consumes ≤ 42 bits
-# between refills (2 literals + subtable + length extra bits), so every lookup sees real bits.
+# Below this, a match refills before its offset: the longest offset (15-bit code + 13 extra bits)
+# must leave real bits for the next lookup, and real bits exceed `bitsleft` by ≥ 1.
+const OFFSET_REFILL_BELOW = 15 + 13 + LITLEN_TABLEBITS - 1
+
+# One fast-loop step: ≤ 3 literals or one match, from a refilled `r` and its looked-up entry `e`.
+# Entries are looked up before the refill they follow: a fast refill leaves 64 real bits in `bitbuf`
+# and a step consumes ≤ 42 bits before its offset (2 literals + subtable + length extra bits).
 @inline function fast_step(r::Regs, e::UInt32, lit::Ptr{UInt32}, off::Ptr{UInt32}, out_start::Ptr{UInt8})
-    r = refill_fast(r)
     if e & LITERAL != 0
         r = put_literal(r, e)
         e = litentry(lit, r)
@@ -365,7 +372,7 @@ end
             e = litentry(lit, r)
             if e & LITERAL != 0
                 r = put_literal(r, e)
-                return r, litentry(lit, r), OK
+                return refill_fast(r), litentry(lit, r), OK
             end
         end
     end
@@ -374,7 +381,7 @@ end
             r, e = enter_subtable(lit, r, e)
             if e & LITERAL != 0
                 r = put_literal(r, e)
-                return r, litentry(lit, r), OK
+                return refill_fast(r), litentry(lit, r), OK
             end
             e & EXCEPTIONAL != 0 || @goto length
         end
@@ -384,14 +391,16 @@ end
     @label length
     r, len = take_value(r, e)
     e = offentry(off, r)
-    r = refill_fast(r)
+    r.bitsleft < OFFSET_REFILL_BELOW && (r = refill_fast(r))
     e & SUBTABLE != 0 && ((r, e) = enter_subtable(off, r, e))
     e & EXCEPTIONAL != 0 && return r, e, BAD
     r, dist = take_value(r, e)
     dist > UInt64(r.out - out_start) && return r, e, BAD
-    copy_match(r.out, dist, len)
-    r = Regs(r.bitbuf, r.bitsleft, r.inp, r.out + len)
-    return r, litentry(lit, r), OK
+    e = litentry(lit, r)
+    out = r.out
+    r = refill_fast(Regs(r.bitbuf, r.bitsleft, r.inp, out + len))
+    copy_match(out, dist, len)
+    return r, e, OK
 end
 
 end_block!(s::Stream) = (s.state = s.final ? DONE : HEADER)
@@ -411,7 +420,7 @@ end
     all(ntuple(k -> rs[k].inp <= in_lims[k] && rs[k].out <= out_lims[k], Val(N)))
 
 # Run the fast loops of `ss` in lockstep until any stream ends its block or nears a buffer
-# end. Callers ensure `fast_ok`; the initial refill makes the bits above `bitsleft` real.
+# end. Callers ensure `fast_ok`.
 function run_fast!(ss::NTuple{N,Stream}) where {N}
     lits, offs, starts = map(s -> s.lit, ss), map(s -> s.off, ss), map(s -> s.out_start, ss)
     in_lims, out_lims = map(s -> s.in_end - IN_MARGIN, ss), map(s -> s.out_end - OUT_MARGIN, ss)
@@ -455,7 +464,7 @@ function run_slow!(s::Stream)
         dist > UInt64(r.out - s.out_start) && bad("match distance too far back")
         len > UInt64(s.out_end - r.out) && bad("deflate output exceeds expected size")
         # Near the input end of a highly compressed stream this loop still emits most bytes.
-        if UInt64(s.out_end - r.out) >= len + 16
+        if UInt64(s.out_end - r.out) >= len + COPY_OVERRUN
             copy_match(r.out, dist, len)
         else
             src = r.out - dist
